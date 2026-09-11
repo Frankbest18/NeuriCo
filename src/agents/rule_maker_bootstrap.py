@@ -88,6 +88,8 @@ def generate_bootstrap_rule_maker_prompt(
     curated_manifest: Dict[str, Any],
     work_dir: Path,
     templates_dir: Path,
+    *,
+    hitl_phase: Optional[str] = None,
 ) -> str:
     """
     Build the bootstrap rule_maker prompt by substituting workspace details,
@@ -115,6 +117,25 @@ def generate_bootstrap_rule_maker_prompt(
     prompt = template
     for placeholder, value in substitutions.items():
         prompt = prompt.replace(placeholder, value)
+    if hitl_phase is None:
+        return prompt
+    if hitl_phase not in {"plan", "execution", "review"}:
+        raise ValueError(f"Unsupported managed bootstrap rule-maker phase: {hitl_phase}")
+    phase_instruction = {
+        "plan": (
+            "This is the planning phase. Design the complete bootstrap evaluator, but do "
+            "not create or modify evaluator artifacts until the plan is approved."
+        ),
+        "execution": (
+            "This is the execution phase. Implement the approved bootstrap evaluator "
+            "without changing the completed experiment or its outputs."
+        ),
+        "review": (
+            "This is the review-revision phase. Apply only the returned feedback to the "
+            "bootstrap evaluator, preserving the completed experiment and its outputs."
+        ),
+    }[hitl_phase]
+    prompt = f"{phase_instruction}\n\n{prompt}"
     return prompt
 
 
