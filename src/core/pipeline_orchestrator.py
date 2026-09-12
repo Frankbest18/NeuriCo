@@ -2959,7 +2959,6 @@ class ResearchPipelineOrchestrator:
                     baseline_candidate_manifest=candidate_manifest,
                     runtime_override=managed_runtime,
                     rule_maker_output_validator=validate_bootstrap_evaluator,
-                    persist_required_contract=False,
                 ),
             )
         except Exception:

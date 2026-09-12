@@ -92,6 +92,12 @@ Prepare exactly these persistent evaluator files:
 |---|---|---|
 | `relative/candidate/path` | json | Authoritative aggregate result |
 
+## Files to produce
+
+| Path | Purpose | Required |
+|---|---|---|
+| `relative/candidate/path` | Authoritative aggregate result | yes |
+
 ## Producer API
 
 Describe a relevant public signature from the candidate manifest when one is
@@ -104,8 +110,10 @@ Describe how the evaluator reads only the selected primary outputs and writes
 `scoring/results.json`.
 ```
 
-The `Primary outputs` table header and its three columns must match the example
-exactly. Every selected path must appear in `candidate_output_paths`.
+The `Primary outputs` and `Files to produce` table headers must match the
+examples exactly. Both tables must list the same selected paths, every selected
+path must appear in `candidate_output_paths`, and every selected path must be
+marked required.
 
 `scoring/eval.py` must be a self-contained script invoked from the workspace
 root as:
