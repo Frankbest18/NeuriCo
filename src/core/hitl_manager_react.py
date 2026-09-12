@@ -1044,6 +1044,7 @@ class HitlManager:
         request_context: Optional[Dict[str, Any]] = None,
         scoring_enabled: bool = False,
         baseline_construction: bool = False,
+        baseline_candidate_manifest: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         from core.hitl import _load_hitl_template, _normalize_options, _validate_substantive_options
 
@@ -1117,6 +1118,9 @@ class HitlManager:
             assigned_candidate_sha=assigned_candidate_sha,
             scoring_enabled=scoring_enabled,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest_json=json.dumps(
+                baseline_candidate_manifest or {}, indent=2, ensure_ascii=False
+            ),
         )
         return self.request_worker_resolution(
             command={
@@ -1150,6 +1154,7 @@ class HitlManager:
         scoring_handoff_context: Optional[Dict[str, Any]] = None,
         verifier_report: str = "",
         baseline_construction: bool = False,
+        baseline_candidate_manifest: Optional[Dict[str, Any]] = None,
         on_finalize: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         on_scoring_approval: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         hitl_mode: HitlMode | str = HitlMode.FULL,
@@ -1256,6 +1261,9 @@ class HitlManager:
             autoresearch_attempt=autoresearch_attempt,
             assigned_candidate_sha=assigned_candidate_sha,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest_json=json.dumps(
+                baseline_candidate_manifest or {}, indent=2, ensure_ascii=False
+            ),
         )
         return self.request_worker_resolution(
             command={

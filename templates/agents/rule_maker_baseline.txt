@@ -128,10 +128,26 @@ workspace. Resolve paths relative to the workspace root. The evaluator must
 depend only on file contents present in the scoring workspace; repository
 metadata and external state are not guaranteed.
 
-`scoring/targets.json` must define one to four meaningful research properties.
-Each property requires a numeric target, `max` or `min` direction, and a concise
-description. Define either `ALL_PROPERTIES_SATISFIED` or
-`PRIMARY_PROPERTY_SATISFIED` as the success rule.
+`scoring/targets.json` must use this structure:
+
+```json
+{
+  "properties": {
+    "<property_name>": {
+      "target": 0.0,
+      "direction": "max",
+      "description": "<one short value-free sentence>"
+    }
+  },
+  "success_rule": "ALL_PROPERTIES_SATISFIED"
+}
+```
+
+`properties` must be a non-empty JSON object containing one to four meaningful
+research properties. Each property requires a numeric target, a direction of
+`max` or `min`, and a concise description. Define either
+`ALL_PROPERTIES_SATISFIED` or `PRIMARY_PROPERTY_SATISFIED` as the success rule;
+when using the latter, also set `primary_property` to one declared property.
 
 Every target must be justified in `scoring/rule_maker_log.md` using the stated
 research objective, a cited literature baseline, a documented dataset

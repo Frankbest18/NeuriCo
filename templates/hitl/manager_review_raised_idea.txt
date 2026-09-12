@@ -16,6 +16,13 @@ scoring contract. Require the rule maker to select and justify authoritative
 outputs from those candidates and to measure the research result rather than
 file existence. Do not resolve an uncertainty by authorizing a generic
 artifact-validity objective.
+
+Use this read-only candidate manifest when resolving the request. It is runtime
+evidence and must not be copied into the worker's plan or artifacts:
+
+```json
+{{ baseline_candidate_manifest_json }}
+```
 {% endif %}
 
 - To ensure objectivity and security, the rule maker is solely responsible for

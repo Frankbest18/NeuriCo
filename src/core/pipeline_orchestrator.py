@@ -635,6 +635,7 @@ class ResearchPipelineOrchestrator:
         *,
         scoring_handler: Any = None,
         baseline_construction: bool = False,
+        baseline_candidate_manifest: Optional[Dict[str, Any]] = None,
         plan_finish_validator: Any = None,
     ) -> Optional[tuple[Dict[str, Any], Dict[str, Any]]]:
         if not self.managed_initial_run:
@@ -683,6 +684,7 @@ class ResearchPipelineOrchestrator:
             allow_scoring_approval=scoring_handler is not None,
             scoring_handler=scoring_handler,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest=baseline_candidate_manifest,
         )
         return run_worker_with_replacements(
             runtime=runtime,
@@ -2394,6 +2396,7 @@ class ResearchPipelineOrchestrator:
         plan_finish_validator: Optional[Callable[[], Dict[str, Any]]] = None,
         scoring_handler: Optional[Callable[[Dict[str, Any]], None]] = None,
         baseline_construction: bool = False,
+        baseline_candidate_manifest: Optional[Dict[str, Any]] = None,
         runtime_override: Optional[HitlRuntime] = None,
         rule_maker_output_validator: Optional[
             Callable[[Path], Dict[str, Any]]
@@ -2539,6 +2542,7 @@ class ResearchPipelineOrchestrator:
                 rule_maker_artifact_validator,
                 scoring_handler=scoring_handler,
                 baseline_construction=baseline_construction,
+                baseline_candidate_manifest=baseline_candidate_manifest,
                 plan_finish_validator=plan_finish_validator,
             )
             if resumed is not None:
@@ -2554,6 +2558,7 @@ class ResearchPipelineOrchestrator:
                     allow_scoring_approval=bool(scoring_handler),
                     scoring_handler=scoring_handler,
                     baseline_construction=baseline_construction,
+                    baseline_candidate_manifest=baseline_candidate_manifest,
                 )
                 result, finish = run_worker_with_replacements(
                     runtime=runtime,
@@ -2585,6 +2590,7 @@ class ResearchPipelineOrchestrator:
                 allow_scoring_approval=bool(scoring_handler),
                 scoring_handler=scoring_handler,
                 baseline_construction=baseline_construction,
+                baseline_candidate_manifest=baseline_candidate_manifest,
             )
 
         except HitlRunStopRequested:
@@ -2950,6 +2956,7 @@ class ResearchPipelineOrchestrator:
                     plan_finish_validator=validate_baseline_plan,
                     scoring_handler=score_baseline,
                     baseline_construction=True,
+                    baseline_candidate_manifest=candidate_manifest,
                     runtime_override=managed_runtime,
                     rule_maker_output_validator=validate_bootstrap_evaluator,
                     persist_required_contract=False,

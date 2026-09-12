@@ -77,6 +77,7 @@ def run_plan_centered_hitl_stage(
     allow_scoring_approval: bool = False,
     scoring_handler: Callable[[Dict[str, Any]], None] | None = None,
     baseline_construction: bool = False,
+    baseline_candidate_manifest: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Run the shared plan/execution state machine for ordinary HITL stages."""
     # A held request's saved phase takes precedence over plan approval on restart.
@@ -113,6 +114,7 @@ def run_plan_centered_hitl_stage(
             allow_scoring_approval=allow_scoring_approval,
             scoring_handler=scoring_handler,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest=baseline_candidate_manifest,
         )
         prompt = _load_hitl_template("worker_resume_pending_request.txt")
         log_prefix = plan_log_prefix if saved_phase == "plan" else execution_log_prefix
@@ -134,6 +136,7 @@ def run_plan_centered_hitl_stage(
             allow_scoring_approval=allow_scoring_approval,
             scoring_handler=scoring_handler,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest=baseline_candidate_manifest,
         )
         prompt = runtime.compose_worker_prompt(
             hitl_stage="plan",
@@ -151,6 +154,7 @@ def run_plan_centered_hitl_stage(
             allow_scoring_approval=allow_scoring_approval,
             scoring_handler=scoring_handler,
             baseline_construction=baseline_construction,
+            baseline_candidate_manifest=baseline_candidate_manifest,
         )
         prompt = runtime.compose_worker_prompt(
             hitl_stage="execution",

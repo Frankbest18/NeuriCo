@@ -83,6 +83,13 @@ evidence, and that the proposed properties measure the research result rather
 than merely whether a file exists. If the candidate information is insufficient
 for a defensible evaluator, return precise feedback instead of approving a
 generic artifact-validity objective.
+
+Use this read-only candidate manifest to verify the selected outputs. It is
+runtime evidence and must not be copied into the worker's plan or artifacts:
+
+```json
+{{ baseline_candidate_manifest_json }}
+```
 {% endif %}
 {% if hitl_stage == "plan" %}
 For this rule-maker review, determine whether the proposed evaluation design is

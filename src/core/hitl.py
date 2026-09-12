@@ -1120,6 +1120,9 @@ class HitlRuntime:
             baseline_construction=bool(
                 self._tool_context.get("baseline_construction")
             ),
+            baseline_candidate_manifest=dict(
+                self._tool_context.get("baseline_candidate_manifest") or {}
+            ),
         )
         try:
             return finalized["record"]
@@ -1143,6 +1146,7 @@ class HitlRuntime:
         scoring_handler: Optional[Callable[[Dict[str, Any]], None]] = None,
         worker_prompt_contexts: Optional[Dict[str, str]] = None,
         baseline_construction: bool = False,
+        baseline_candidate_manifest: Optional[Dict[str, Any]] = None,
     ) -> None:
         if hitl_stage not in HITL_STAGES:
             raise HitlValidationError(f"Invalid HITL idea tool hitl_stage: {hitl_stage}")
@@ -1198,6 +1202,7 @@ class HitlRuntime:
             "scoring_handler": scoring_handler,
             "worker_prompt_contexts": dict(worker_prompt_contexts or {}),
             "baseline_construction": bool(baseline_construction),
+            "baseline_candidate_manifest": dict(baseline_candidate_manifest or {}),
             "allowed_worker_commands": allowed_worker_commands,
         }
         self._install_stage_guards(hitl_stage)
@@ -3271,6 +3276,9 @@ class HitlRuntime:
                 verifier_report=self._durable_conformance_report(request_key, hitl_stage),
                 baseline_construction=bool(
                     self._tool_context.get("baseline_construction")
+                ),
+                baseline_candidate_manifest=dict(
+                    self._tool_context.get("baseline_candidate_manifest") or {}
                 ),
                 on_finalize=persist_phase_review,
                 on_scoring_approval=persist_scoring_approval,
