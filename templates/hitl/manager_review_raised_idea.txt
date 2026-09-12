@@ -10,6 +10,12 @@ it:
 The completed experiment and its outputs are fixed. Resolve the request only
 within the bootstrap evaluator's design and implementation. Do not defer work to
 an experiment runner or request changes to the completed experiment.
+
+The mechanical manifest supplies possible outputs but does not decide the
+scoring contract. Require the rule maker to select and justify authoritative
+outputs from those candidates and to measure the research result rather than
+file existence. Do not resolve an uncertainty by authorizing a generic
+artifact-validity objective.
 {% endif %}
 
 - To ensure objectivity and security, the rule maker is solely responsible for

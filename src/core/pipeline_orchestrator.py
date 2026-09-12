@@ -45,6 +45,7 @@ from agents.rule_maker import (
 from agents.rule_maker_bootstrap import (
     BOOTSTRAP_OUTPUT_FILES,
     generate_bootstrap_rule_maker_prompt,
+    generate_managed_baseline_rule_maker_prompt,
     run_bootstrap_rule_maker,
     validate_bootstrap_outputs,
 )
@@ -66,7 +67,11 @@ from core.scoring_seal import (
     unseal_scoring_files,
     verify_sealed_scoring_manifest,
 )
-from core.workspace_manifest import build_manifest, curate_manifest
+from core.workspace_manifest import (
+    build_baseline_candidate_manifest,
+    build_manifest,
+    curate_manifest,
+)
 from core.phase_state import (
     check_working_directory,
     validate_outputs,
@@ -2748,22 +2753,25 @@ class ResearchPipelineOrchestrator:
             "work_dir": str(self.work_dir),
             "stages": {},
         }
-        manifest_result = self._run_bootstrap_manifest(
-            provider=provider,
-            full_permissions=full_permissions,
-            manifest_trimmer_timeout=manifest_trimmer_timeout,
-        )
+        # Keep the legacy bootstrap trimmer unchanged. Managed construction
+        # uses deterministic structural candidates and assigns the semantic
+        # output choice to the reviewed rule-maker plan.
+        manifest_result = self._run_managed_baseline_manifest()
         results["stages"][BOOTSTRAP_MANIFEST_STAGE] = manifest_result
         if not manifest_result.get("success"):
             return results
 
-        curated_manifest = manifest_result["curated_manifest"]
+        candidate_manifest = manifest_result["candidate_manifest"]
+        candidate_paths = set(candidate_manifest.get("candidate_output_paths", []))
         sealed_outputs = self._seal_bootstrap_inputs()
         output_guard = HitlWorkspaceWriteGuard.capture_public(self.work_dir)
         scoring_result: Dict[str, Any] = {}
 
         def validate_bootstrap_evaluator(path: Path) -> Dict[str, Any]:
-            report = validate_bootstrap_outputs(path)
+            report = validate_bootstrap_outputs(
+                path,
+                allowed_primary_outputs=candidate_paths,
+            )
             checks = dict(report.get("checks") or {})
             missing = [
                 f"scoring/{filename} is missing."
@@ -2771,7 +2779,25 @@ class ResearchPipelineOrchestrator:
                 if not (Path(path) / "scoring" / filename).is_file()
             ]
             failed = [name for name, passed in checks.items() if passed is False]
-            issues = [*missing, *(f"Bootstrap evaluator check failed: {name}." for name in failed)]
+            issues = list(missing)
+            primary_output_error = str(report.get("primary_output_error") or "").strip()
+            if primary_output_error:
+                issues.append(primary_output_error)
+            if checks.get("targets_avoid_generic_artifact_validity") is False:
+                issues.append(
+                    "scoring/targets.json uses the generic `artifact_validity` "
+                    "property instead of a meaningful research property."
+                )
+            explained = {
+                "primary_outputs_parse",
+                "primary_outputs_are_candidates",
+                "targets_avoid_generic_artifact_validity",
+            }
+            issues.extend(
+                f"Bootstrap evaluator check failed: {name}."
+                for name in failed
+                if name not in explained
+            )
             return {
                 "valid": not issues,
                 "issues": issues,
@@ -2901,8 +2927,8 @@ class ResearchPipelineOrchestrator:
             )
 
         worker_prompt_contexts = {
-            phase: generate_bootstrap_rule_maker_prompt(
-                curated_manifest,
+            phase: generate_managed_baseline_rule_maker_prompt(
+                candidate_manifest,
                 self.work_dir,
                 self.templates_dir,
                 hitl_phase=phase,
@@ -2949,6 +2975,61 @@ class ResearchPipelineOrchestrator:
         if not results["success"] and sealed_outputs is not None:
             self._unseal_bootstrap_inputs(sealed_outputs)
         return results
+
+    def _run_managed_baseline_manifest(self) -> Dict[str, Any]:
+        """Persist deterministic output candidates for Construct baseline only."""
+        print()
+        print("=" * 80)
+        print(f"STAGE: {BOOTSTRAP_MANIFEST_STAGE}")
+        print("=" * 80)
+        relative_path = ".neurico/baseline_candidate_manifest.json"
+        self.state.start_stage(
+            BOOTSTRAP_MANIFEST_STAGE,
+            expected_outputs=[relative_path],
+        )
+        try:
+            raw_manifest = build_manifest(self.work_dir)
+            candidate_manifest = build_baseline_candidate_manifest(raw_manifest)
+            candidates = candidate_manifest.get("candidate_outputs", [])
+            if not candidates:
+                raise RuntimeError(
+                    "The completed Ordinary workspace has no mechanically identifiable "
+                    "experiment output for baseline construction."
+                )
+            manifest_path = self.work_dir / relative_path
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(candidate_manifest, indent=2),
+                encoding="utf-8",
+            )
+            outputs = {
+                "candidate_manifest_path": str(manifest_path),
+                "curation": "mechanical_candidates",
+                "candidate_count": len(candidates),
+            }
+            success = self.state.complete_stage(
+                BOOTSTRAP_MANIFEST_STAGE,
+                success=True,
+                outputs=outputs,
+            )
+            print(
+                f"📐 Mechanical baseline candidates: {len(candidates)} "
+                "(semantic selection deferred to the rule maker)"
+            )
+            return {
+                "success": success,
+                "candidate_manifest": candidate_manifest,
+                **outputs,
+            }
+        except Exception as exc:
+            error = str(exc)
+            print(f"❌ Baseline candidate manifest error: {error}")
+            self.state.complete_stage(
+                BOOTSTRAP_MANIFEST_STAGE,
+                success=False,
+                outputs={"error": error},
+            )
+            return {"success": False, "error": error}
 
     def _run_bootstrap_pipeline(
         self,

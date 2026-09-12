@@ -74,6 +74,15 @@ The completed experiment and its outputs are fixed. Review only whether the
 bootstrap evaluator provides a sound, complete scoring contract for that
 existing work. Do not request changes to the experiment or route work to an
 experiment runner.
+
+The rule maker received a mechanically generated, value-redacted list of
+possible completed outputs. It—not the mechanical scan—must select and justify
+the authoritative output or outputs. Before approving the plan, confirm that
+the selection is supported by the research objective and available structural
+evidence, and that the proposed properties measure the research result rather
+than merely whether a file exists. If the candidate information is insufficient
+for a defensible evaluator, return precise feedback instead of approving a
+generic artifact-validity objective.
 {% endif %}
 {% if hitl_stage == "plan" %}
 For this rule-maker review, determine whether the proposed evaluation design is
@@ -96,9 +105,9 @@ another component, or any external source.
 
 {% if baseline_construction %}
 Confirm that the metrics and targets are grounded in the research objective or
-documented external anchors, and that the evaluator references only experiment
-artifacts present in the curated manifest. Runtime—not the rule maker—will run
-the evaluator against the withheld completed outputs after approval.
+documented external anchors, and that the evaluator references only outputs
+selected from the mechanical candidate manifest. Runtime—not the rule maker—will
+run the evaluator against the withheld completed outputs after approval.
 {% else %}
 The evaluator must depend only on file contents present in the scoring
 workspace. Repository metadata, including nested `.git` data, is not guaranteed.
