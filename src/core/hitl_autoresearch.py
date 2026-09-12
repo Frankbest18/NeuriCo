@@ -82,6 +82,44 @@ HitlCommentModeHook = Callable[..., Dict[str, Any]]
 MAX_ACTIVE_HITL_FRONTIER_NODES = 10
 
 
+def managed_baseline_construction_eligibility(
+    work_dir: Path,
+    *,
+    pipeline_state: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Report whether a completed Ordinary workspace can become a frontier root."""
+    work_dir = Path(work_dir)
+    if pipeline_state is None:
+        state_path = work_dir / ".neurico" / "pipeline_state.json"
+        try:
+            pipeline_state = json.loads(state_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {
+                "available": False,
+                "reason": "Baseline construction requires a completed Ordinary research workspace.",
+            }
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("The workspace pipeline state is unreadable.") from exc
+    if not isinstance(pipeline_state, dict):
+        raise RuntimeError("The workspace pipeline state is invalid.")
+    if str(pipeline_state.get("workflow", "")).strip().lower() != "ordinary":
+        return {
+            "available": False,
+            "reason": "Baseline construction is available only for Ordinary research workspaces.",
+        }
+    if not bool(pipeline_state.get("completed")):
+        return {
+            "available": False,
+            "reason": "Baseline construction requires a successfully completed Ordinary run.",
+        }
+    if HitlFrontierStore(work_dir).exists():
+        return {
+            "available": False,
+            "reason": "This workspace already has an AutoResearch frontier.",
+        }
+    return {"available": True, "reason": ""}
+
+
 def _adopt_run_hitl_mode(work_dir: Path, hitl_mode: HitlMode | str) -> HitlMode:
     """Adopt a run policy without rewriting completed decisions."""
 
