@@ -16,9 +16,15 @@ import cli.hitl_run_worker as run_worker  # noqa: E402
 import core.pipeline_orchestrator as pipeline  # noqa: E402
 from core.autoresearch import CheckpointManager  # noqa: E402
 from core.hitl import HitlIdeaLog, HitlRuntime  # noqa: E402
-from core.hitl_paths import hitl_stop_request_path  # noqa: E402
+from core.hitl_git_state import HitlGitStateStore  # noqa: E402
+from core.hitl_paths import (  # noqa: E402
+    hitl_launch_status_path,
+    hitl_runtime_state_path,
+    hitl_stop_request_path,
+)
 from core.hitl_runtime_state import HitlRuntimeState  # noqa: E402
 from core.hitl_workspace_guard import HitlWorkspaceWriteGuard  # noqa: E402
+from core.hitl_workspace_view import HitlWorkspaceView  # noqa: E402
 from core.scoring_seal import seal_scoring_files, sealed_dir_for  # noqa: E402
 
 
@@ -75,6 +81,149 @@ def test_run_worker_does_not_translate_sigterm_into_user_stop(tmp_path, monkeypa
     registrations[signal.SIGINT](signal.SIGINT, None)
     stop = run_worker.HitlRunStopControl(work_dir, request_id).record()
     assert stop["requested_by"] == "signal:sigint"
+
+
+def test_private_hitl_restore_preserves_current_launch_identity(tmp_path):
+    """Rollback ignores launch state even when an older snapshot contains it."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.name", "NeuriCo Test"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "config",
+            "user.email",
+            "neurico@example.invalid",
+        ],
+        check=True,
+    )
+    launch_path = hitl_launch_status_path(tmp_path)
+    runtime_path = hitl_runtime_state_path(tmp_path)
+    launch_path.parent.mkdir(parents=True)
+    launch_path.write_text('{"request_id":"old-run"}\n', encoding="utf-8")
+    runtime_path.write_text('{"boundary":"before"}\n', encoding="utf-8")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "add",
+            "-f",
+            ".neurico/hitl/launch.json",
+            ".neurico/hitl/runtime.json",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "commit", "-qm", "legacy private snapshot"],
+        check=True,
+    )
+    legacy_ref = "refs/neurico/hitl-rollback/legacy"
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "update-ref", legacy_ref, "HEAD"],
+        check=True,
+    )
+
+    store = HitlGitStateStore(tmp_path)
+    launch_path.write_text('{"request_id":"current-run"}\n', encoding="utf-8")
+    runtime_path.write_text('{"boundary":"after"}\n', encoding="utf-8")
+    snapshot = store.create_rollback_snapshot()
+    captured_paths = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "ls-tree",
+            "-r",
+            "--name-only",
+            snapshot.commit_sha,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert ".neurico/hitl/launch.json" not in captured_paths
+
+    store.restore(legacy_ref)
+
+    assert launch_path.read_text(encoding="utf-8") == '{"request_id":"current-run"}\n'
+    assert runtime_path.read_text(encoding="utf-8") == '{"boundary":"before"}\n'
+
+
+@pytest.mark.parametrize(
+    ("launch_request_id", "stop_request_id", "expected_state"),
+    [
+        ("old-run", "old-run", "starting"),
+        ("current-run", "old-run", "starting"),
+        ("old-run", "current-run", "stopping"),
+        ("current-run", "current-run", "stopping"),
+    ],
+)
+def test_live_status_uses_active_owner_as_run_authority(
+    tmp_path, launch_request_id, stop_request_id, expected_state
+):
+    launch_path = hitl_launch_status_path(tmp_path)
+    launch_path.parent.mkdir(parents=True)
+    launch_path.write_text(
+        (
+            '{"status":"running","request_id":"%s","mode":"fresh",'
+            '"hitl_mode":"full","provider":"claude",'
+            '"started_at":"2026-01-01T00:00:00Z",'
+            '"updated_at":"2026-01-01T00:00:00Z"}\n'
+        )
+        % launch_request_id,
+        encoding="utf-8",
+    )
+    stop_path = hitl_stop_request_path(tmp_path, stop_request_id)
+    stop_path.parent.mkdir(parents=True, exist_ok=True)
+    stop_path.write_text(
+        '{"action":"stop","request_id":"%s"}\n' % stop_request_id,
+        encoding="utf-8",
+    )
+    owner = {
+        "request_id": "current-run",
+        "mode": "continue",
+        "hitl_mode": "auto",
+        "provider": "codex",
+        "started_at": "2026-02-01T00:00:00Z",
+    }
+
+    status = HitlWorkspaceView(tmp_path)._live_status(
+        {}, owner=owner, owner_checked=True
+    )
+
+    assert status["state"] == expected_state
+    assert status["mode"] == "continue"
+    assert status["hitl_mode"] == "auto"
+    assert status["provider"] == "codex"
+    assert status["started_at"] == "2026-02-01T00:00:00Z"
+
+
+def test_live_status_keeps_launch_authoritative_without_owner(tmp_path):
+    launch_path = hitl_launch_status_path(tmp_path)
+    launch_path.parent.mkdir(parents=True)
+    launch_path.write_text(
+        (
+            '{"status":"running","request_id":"old-run","mode":"continue",'
+            '"hitl_mode":"auto","provider":"claude",'
+            '"updated_at":"2026-01-01T00:00:00Z"}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    status = HitlWorkspaceView(tmp_path)._live_status(
+        {}, owner=None, owner_checked=True
+    )
+
+    assert status["state"] == "interrupted"
+    assert status["active"] is False
+    assert status["mode"] == "continue"
+    assert status["hitl_mode"] == "auto"
+    assert status["provider"] == "claude"
 
 
 class _RecoveryManager:
