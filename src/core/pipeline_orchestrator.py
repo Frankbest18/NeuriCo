@@ -1815,6 +1815,36 @@ class ResearchPipelineOrchestrator:
             },
         )
 
+    def _experiment_runner_artifact_validator(
+        self,
+        *,
+        scoring_enabled: bool,
+    ) -> Optional[Callable[[], Dict[str, Any]]]:
+        """Return the existing completion contract for this experiment workflow."""
+        if scoring_enabled:
+            return lambda: validate_required_artifact_contract(self.work_dir)
+        if not (self.managed_initial_run and not self.hitl_autoresearch):
+            return None
+
+        def validate_ordinary_report() -> Dict[str, Any]:
+            validation = validate_outputs(self.work_dir, ["REPORT.md"])
+            issues = [
+                f"Required ordinary research output is missing: {path}"
+                for path in validation.get("missing", [])
+            ]
+            return {
+                **validation,
+                "issues": issues,
+                "worker_feedback": (
+                    "Ordinary research is incomplete because REPORT.md is missing. "
+                    "Create the completed research report, then call hitl-finish-phase again."
+                    if issues
+                    else ""
+                ),
+            }
+
+        return validate_ordinary_report
+
     def _run_experiment_runner_hitl(
         self,
         idea: Dict[str, Any],
@@ -1833,10 +1863,14 @@ class ResearchPipelineOrchestrator:
         print("─" * 80)
         print()
 
+        managed_ordinary = self.managed_initial_run and not self.hitl_autoresearch
         if self.hitl_autoresearch and not self.state.get_runtime_recovery("experiment_runner"):
             self._arm_experiment_runner_recovery_checkpoint()
         if not self._initial_stage_request("experiment_runner"):
-            self.state.start_stage("experiment_runner")
+            self.state.start_stage(
+                "experiment_runner",
+                expected_outputs=["REPORT.md"] if managed_ordinary else None,
+            )
         runtime = self._create_hitl_runtime("experiment_runner")
         worker_prompt_contexts = {
             phase: self._hitl_experiment_runner_source_prompt(
@@ -1858,10 +1892,8 @@ class ResearchPipelineOrchestrator:
         )
         scored_checkpoint_sha: Optional[str] = None
 
-        artifact_validator = (
-            (lambda: validate_required_artifact_contract(self.work_dir))
-            if scoring_enabled
-            else None
+        artifact_validator = self._experiment_runner_artifact_validator(
+            scoring_enabled=scoring_enabled
         )
 
         def restore_failed_hitl_state() -> None:
