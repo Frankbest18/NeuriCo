@@ -2033,6 +2033,18 @@ class ResearchPipelineOrchestrator:
             self.templates_dir,
             workspace_mode=self.workspace_mode,
         )
+
+        def apply_focused_scope(prompt: str) -> str:
+            if not self.focused_autoresearch:
+                return prompt
+            contract = generator.render_template(
+                generator.load_template(
+                    "hitl/focused_autoresearch_experiment_runner.txt"
+                ),
+                {"hitl_phase": hitl_phase},
+            ).strip()
+            return f"{prompt.rstrip()}\n\n{contract}\n"
+
         if hitl_phase == "execution":
             ordinary_prompt = generator.generate_research_prompt(
                 idea,
@@ -2041,29 +2053,33 @@ class ResearchPipelineOrchestrator:
                 include_implicit_time_limit=False,
                 focused_autoresearch=self.focused_autoresearch,
             )
-            return generate_instructions(
-                prompt=ordinary_prompt,
-                work_dir=str(self.work_dir),
-                use_scribe=use_scribe,
-                domain=idea.get("idea", {}).get("domain", "general"),
-                idea_spec=idea.get("idea", {}),
-                provider=provider,
-                focused_autoresearch=self.focused_autoresearch,
+            return apply_focused_scope(
+                generate_instructions(
+                    prompt=ordinary_prompt,
+                    work_dir=str(self.work_dir),
+                    use_scribe=use_scribe,
+                    domain=idea.get("idea", {}).get("domain", "general"),
+                    idea_spec=idea.get("idea", {}),
+                    provider=provider,
+                    focused_autoresearch=self.focused_autoresearch,
+                )
             )
         if hitl_phase not in {"plan", "review"}:
             raise ValueError(f"Unsupported HITL experiment-runner phase: {hitl_phase}")
         interface_path = self.work_dir / "scoring" / "interface.md"
-        return generator.render_template(
-            generator.load_template("hitl/experiment_runner_context.txt"),
-            {
-                "hitl_phase": hitl_phase,
-                "idea_json": json.dumps(idea, indent=2, default=str),
-                "scoring_interface": (
-                    interface_path.read_text(encoding="utf-8")
-                    if interface_path.is_file()
-                    else ""
-                ),
-            },
+        return apply_focused_scope(
+            generator.render_template(
+                generator.load_template("hitl/experiment_runner_context.txt"),
+                {
+                    "hitl_phase": hitl_phase,
+                    "idea_json": json.dumps(idea, indent=2, default=str),
+                    "scoring_interface": (
+                        interface_path.read_text(encoding="utf-8")
+                        if interface_path.is_file()
+                        else ""
+                    ),
+                },
+            )
         )
 
     def _experiment_runner_artifact_validator(
