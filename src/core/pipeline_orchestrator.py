@@ -1759,6 +1759,7 @@ class ResearchPipelineOrchestrator:
                 on_failed=finalize_failed,
                 resume_worker=self._resume_initial_worker,
                 execution_log_prefix="resource_finder_hitl_execute_1",
+                focused_autoresearch=self.focused_autoresearch,
             )
 
         except HitlRunStopRequested:
@@ -2038,6 +2039,7 @@ class ResearchPipelineOrchestrator:
                 root_dir=self.work_dir,
                 scoring_enabled=scoring_enabled,
                 include_implicit_time_limit=False,
+                focused_autoresearch=self.focused_autoresearch,
             )
             return generate_instructions(
                 prompt=ordinary_prompt,
@@ -2046,6 +2048,7 @@ class ResearchPipelineOrchestrator:
                 domain=idea.get("idea", {}).get("domain", "general"),
                 idea_spec=idea.get("idea", {}),
                 provider=provider,
+                focused_autoresearch=self.focused_autoresearch,
             )
         if hitl_phase not in {"plan", "review"}:
             raise ValueError(f"Unsupported HITL experiment-runner phase: {hitl_phase}")
@@ -2747,6 +2750,7 @@ class ResearchPipelineOrchestrator:
                     self.work_dir,
                     self.templates_dir,
                     hitl_phase=phase,
+                    focused_autoresearch=self.focused_autoresearch,
                 )
                 for phase in ("plan", "execution", "review")
             }

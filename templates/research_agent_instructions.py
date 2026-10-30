@@ -38,7 +38,8 @@ def generate_instructions(prompt: str, work_dir: str, use_scribe: bool = False,
                           domain: str = 'general', idea_spec=None,
                           provider: str = "claude",
                           scoring_enabled: bool = False,
-                          phase_name: str = "experiment_runner") -> str:
+                          phase_name: str = "experiment_runner",
+                          focused_autoresearch: bool = False) -> str:
     """
     Generate comprehensive session instructions for the research agent.
 
@@ -68,9 +69,14 @@ def generate_instructions(prompt: str, work_dir: str, use_scribe: bool = False,
             provider=provider,
             scoring_enabled=scoring_enabled,
             phase_name=phase_name,
+            focused_autoresearch=focused_autoresearch,
         )
     except TypeError:
         # Backwards compatibility: old Docker images don't support 'domain' parameter
+        if focused_autoresearch:
+            raise RuntimeError(
+                "Focused HITL AutoResearch requires the current NeuriCo prompt generator."
+            )
         print(
             "WARNING: Docker image is outdated and does not support domain-specific "
             "templates. Run './neurico build' or pull the latest image to update.",

@@ -204,6 +204,7 @@ def generate_rule_maker_prompt(
     domain: Optional[str] = None,
     *,
     hitl_phase: Optional[str] = None,
+    focused_autoresearch: bool = False,
 ) -> str:
     """
     Build the rule_maker agent's prompt.

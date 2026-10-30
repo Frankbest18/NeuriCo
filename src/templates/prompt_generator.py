@@ -151,7 +151,8 @@ class PromptGenerator:
     def generate_research_prompt(self, idea: Dict[str, Any],
                                  root_dir: Optional[Path] = None,
                                  scoring_enabled: bool = False,
-                                 include_implicit_time_limit: bool = True) -> str:
+                                 include_implicit_time_limit: bool = True,
+                                 focused_autoresearch: bool = False) -> str:
         """
         Generate the main research prompt from an idea specification.
 
@@ -212,6 +213,7 @@ class PromptGenerator:
 
         # Prepare variables for template rendering
         variables = self._prepare_variables(idea_spec, root_dir)
+        variables['focused_autoresearch'] = bool(focused_autoresearch)
 
         # Compose the full prompt
         prompt_parts = [
@@ -783,7 +785,8 @@ it fits.
                                        idea_spec: Optional[Dict[str, Any]] = None,
                                        provider: str = "claude",
                                        scoring_enabled: bool = False,
-                                       phase_name: str = "experiment_runner") -> str:
+                                       phase_name: str = "experiment_runner",
+                                       focused_autoresearch: bool = False) -> str:
         """
         Generate session instructions from template.
 
@@ -865,6 +868,7 @@ and the general workflow, ALWAYS follow the user's instructions.
             'work_dir': work_dir,
             'max_directions': max_directions,
             'state_contract': state_contract,
+            'focused_autoresearch': bool(focused_autoresearch),
         }
 
         rendered = self.render_template(template, variables)
@@ -976,6 +980,7 @@ substitutes.
         scoring_enabled: bool = False,
         objective: str = "",
         invocation_mode: str = "bootstrap",
+        focused_autoresearch: bool = False,
     ) -> str:
         """
         Generate resource finder prompt from template.
@@ -1171,6 +1176,7 @@ RESEARCH DOMAIN:
             {
                 'max_directions': max_directions,
                 'phase_name': 'resource_finder',
+                'focused_autoresearch': bool(focused_autoresearch),
             },
         )
         full_prompt = research_context + "\n" + state_contract + "\n" + template
