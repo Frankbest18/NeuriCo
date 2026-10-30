@@ -114,7 +114,13 @@ from templates.research_agent_instructions import generate_instructions
 class PipelineState:
     """Tracks pipeline execution state."""
 
-    def __init__(self, work_dir: Path, *, workflow: Optional[str] = None):
+    def __init__(
+        self,
+        work_dir: Path,
+        *,
+        workflow: Optional[str] = None,
+        focused_autoresearch: Optional[bool] = None,
+    ):
         self.work_dir = Path(work_dir)
         self.workspace_mode = read_workspace_mode(self.work_dir)
         self.state_file = self.work_dir / ".neurico" / "pipeline_state.json"
@@ -151,10 +157,57 @@ class PipelineState:
                     "Ordinary research."
                 )
             self.state["workflow"] = requested
+        recorded_focus = self.state.get("focused_autoresearch")
+        if recorded_focus is not None and type(recorded_focus) is not bool:
+            raise RuntimeError(
+                "Pipeline state has an invalid focused AutoResearch setting."
+            )
+        if str(self.state.get("workflow", "")).strip().lower() == "ordinary":
+            if recorded_focus is not None or focused_autoresearch is not None:
+                raise RuntimeError(
+                    "Focused AutoResearch is not valid for an Ordinary research workspace."
+                )
+        if focused_autoresearch is not None:
+            if type(focused_autoresearch) is not bool:
+                raise TypeError("focused_autoresearch must be a Boolean when supplied.")
+            established_focus = bool(recorded_focus) if recorded_focus is not None else False
+            if state_existed and focused_autoresearch != established_focus:
+                raise RuntimeError(
+                    "This workspace already has a different focused AutoResearch setting."
+                )
+            if not state_existed:
+                self.state["focused_autoresearch"] = focused_autoresearch
+                recorded_focus = focused_autoresearch
+        self.focused_autoresearch = (
+            bool(recorded_focus) if recorded_focus is not None else False
+        )
         self.state.setdefault("stages", {})
         self.state.setdefault("current_stage", None)
         self.state.setdefault("completed", False)
         self._save()
+
+    @classmethod
+    def read_focused_autoresearch(cls, work_dir: Path) -> bool:
+        """Read the established focused-mode setting without mutating state."""
+        state_file = Path(work_dir) / ".neurico" / "pipeline_state.json"
+        if not state_file.is_file():
+            return False
+        try:
+            payload = json.loads(state_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("The workspace pipeline state is unreadable.") from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError("The workspace pipeline state is invalid.")
+        value = payload.get("focused_autoresearch")
+        if value is not None and type(value) is not bool:
+            raise RuntimeError(
+                "Pipeline state has an invalid focused AutoResearch setting."
+            )
+        if str(payload.get("workflow", "")).strip().lower() == "ordinary" and value is not None:
+            raise RuntimeError(
+                "Ordinary pipeline state cannot contain focused AutoResearch configuration."
+            )
+        return bool(value) if value is not None else False
 
     @classmethod
     def require_compatible_workflow(cls, work_dir: Path, requested_workflow: str) -> None:
@@ -365,6 +418,7 @@ class ResearchPipelineOrchestrator:
         managed_initial_run: bool = False,
         baseline_construction: bool = False,
         hitl_mode: HitlMode | str = HitlMode.FULL,
+        focused_autoresearch: Optional[bool] = None,
     ):
         """
         Initialize pipeline orchestrator.
@@ -377,6 +431,14 @@ class ResearchPipelineOrchestrator:
         self.hitl_autoresearch = hitl_autoresearch
         self.baseline_construction = baseline_construction
         self.managed_initial_run = managed_initial_run or hitl_autoresearch or baseline_construction
+        if focused_autoresearch is not None and not hitl_autoresearch:
+            raise ValueError(
+                "Focused AutoResearch is valid only for a HITL AutoResearch pipeline."
+            )
+        state_path = self.work_dir / ".neurico" / "pipeline_state.json"
+        focus_request = focused_autoresearch
+        if hitl_autoresearch and not state_path.exists() and focus_request is None:
+            focus_request = False
         self.state = PipelineState(
             self.work_dir,
             workflow=(
@@ -384,6 +446,10 @@ class ResearchPipelineOrchestrator:
                 if self.managed_initial_run and not self.hitl_autoresearch
                 else None
             ),
+            focused_autoresearch=focus_request if hitl_autoresearch else None,
+        )
+        self.focused_autoresearch = (
+            self.state.focused_autoresearch if hitl_autoresearch else False
         )
         self.workspace_mode = self.state.workspace_mode
 

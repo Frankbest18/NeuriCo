@@ -201,6 +201,15 @@ In the run panel:
 
 Do not change paper-writing controls. Focused mode and paper writing remain independent options.
 
+#### `src/core/hitl_manager_host.py`
+
+The terminal HITL setup has its own launch form. Give it the same focused-mode control:
+
+- ask once for a new AutoResearch workspace, defaulting to off;
+- display the stored value without asking when pipeline state is locked;
+- send the same `focused_autoresearch` Boolean to `HitlRunController`;
+- do not show the setting for Ordinary research or baseline construction.
+
 #### Step 1 local verification
 
 Use temporary workspaces to confirm:

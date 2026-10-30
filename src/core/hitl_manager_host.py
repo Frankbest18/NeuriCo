@@ -1020,7 +1020,24 @@ class HitlTerminalChannel(UserChannel):
             hitl_mode = "auto" if auto else "full"
             iterations = 1
             time_limit_seconds = None
+            focused_autoresearch = False
             if operation == "research" and workflow == "autoresearch":
+                if bool(status.get("workflow_locked")):
+                    focused_autoresearch = bool(
+                        status.get("focused_autoresearch", False)
+                    )
+                    self._write_block(
+                        self._ui.system(
+                            "Focused mode: "
+                            + ("Yes" if focused_autoresearch else "No")
+                        )
+                    )
+                else:
+                    focused_autoresearch = self._read_yes_no(
+                        "Focused mode? [y/N]: ",
+                        default=False,
+                        cancellable=True,
+                    )
                 iterations = self._read_integer(
                     "Iterations [2] (1-100): ",
                     2,
@@ -1075,6 +1092,7 @@ class HitlTerminalChannel(UserChannel):
                         {
                             "iterations": iterations,
                             "time_limit_seconds": time_limit_seconds,
+                            "focused_autoresearch": focused_autoresearch,
                         }
                         if operation == "research" and workflow == "autoresearch"
                         else {}
