@@ -300,6 +300,11 @@ def generate_rule_maker_prompt(
                 f"{supplement}\n"
             )
 
+    if focused_autoresearch:
+        focused_path = templates_dir / "hitl" / "focused_autoresearch_rule_maker.txt"
+        focused_contract = focused_path.read_text(encoding="utf-8").strip()
+        prompt = f"{prompt.rstrip()}\n\n{focused_contract}\n"
+
     return prompt
 
 
