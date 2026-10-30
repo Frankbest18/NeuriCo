@@ -854,7 +854,11 @@ and the general workflow, ALWAYS follow the user's instructions.
         max_directions = max(1, min(max_directions, 10))
         state_contract = self.render_template(
             self.load_template('agents/state_contract.txt'),
-            {'max_directions': max_directions, 'phase_name': phase_name},
+            {
+                'max_directions': max_directions,
+                'phase_name': phase_name,
+                'focused_autoresearch': bool(focused_autoresearch),
+            },
         )
 
         # Prepare variables
@@ -1200,6 +1204,13 @@ existing project, environment, dependency metadata, and useful resources.
 These additive-invocation rules override any bootstrap or package-installation
 instruction elsewhere in the resource-finder template.
 """
+
+        if focused_autoresearch:
+            focused_contract = self.render_template(
+                self.load_template("hitl/focused_autoresearch_resource_finder.txt"),
+                {"invocation_mode": invocation_mode},
+            ).strip()
+            full_prompt += f"\n\n{focused_contract}\n"
 
         return full_prompt
 
