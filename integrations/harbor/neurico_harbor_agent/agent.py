@@ -6,6 +6,7 @@ import asyncio
 import codecs
 import os
 import signal
+import shutil
 import sys
 import tempfile
 from collections.abc import Awaitable, Callable

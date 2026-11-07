@@ -532,6 +532,98 @@ def test_child_output_stream_accepts_events_larger_than_asyncio_line_limit() -> 
     asyncio.run(exercise())
 
 
+def test_output_stream_failure_cleans_process_before_evidence_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[str] = []
+
+    class FakeProcess:
+        returncode: int | None = None
+
+    process = FakeProcess()
+
+    async def create_process(*_args: Any, **_kwargs: Any) -> FakeProcess:
+        return process
+
+    async def fail_stream(*_args: Any, **_kwargs: Any) -> int:
+        raise RuntimeError("stream failed")
+
+    async def terminate(target: FakeProcess, **_kwargs: Any) -> None:
+        events.append("terminated")
+        target.returncode = 1
+
+    def export(**_kwargs: Any) -> None:
+        events.append("exported")
+
+    monkeypatch.setattr(agent_module.asyncio, "create_subprocess_exec", create_process)
+    monkeypatch.setattr(agent_module, "_stream_process_output", fail_stream)
+    monkeypatch.setattr(agent_module, "_terminate_process_tree", terminate)
+    monkeypatch.setattr(agent_module, "export_neurico_evidence", export)
+    monkeypatch.setattr(agent_module, "build_autoresearch_environment", lambda *_args, **_kwargs: {})
+
+    async def exercise() -> None:
+        with pytest.raises(RuntimeError, match="stream failed"):
+            await agent_module.run_autoresearch_process(
+                task=HarborAutoResearchTask("Complete the task", tmp_path),
+                connection=CodexInferenceConnection("openai/test", "chatgpt"),
+                base_environment={},
+                workflow="focused-managed-ordinary",
+                reasoning_effort="high",
+                iterations=None,
+                time_limit_seconds=None,
+                emit=lambda _text: asyncio.sleep(0),
+                register_process=lambda _process: False,
+            )
+
+    asyncio.run(exercise())
+    assert events == ["terminated", "exported"]
+
+
+def test_evidence_export_failure_preserves_child_exit_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    messages: list[str] = []
+
+    class FakeProcess:
+        returncode: int | None = None
+
+    process = FakeProcess()
+
+    async def create_process(*_args: Any, **_kwargs: Any) -> FakeProcess:
+        return process
+
+    async def finish_stream(target: FakeProcess, _emit: Any) -> int:
+        target.returncode = 7
+        return 7
+
+    def fail_export(**_kwargs: Any) -> None:
+        raise OSError("log volume unavailable")
+
+    async def emit(text: str) -> None:
+        messages.append(text)
+
+    monkeypatch.setattr(agent_module.asyncio, "create_subprocess_exec", create_process)
+    monkeypatch.setattr(agent_module, "_stream_process_output", finish_stream)
+    monkeypatch.setattr(agent_module, "export_neurico_evidence", fail_export)
+    monkeypatch.setattr(agent_module, "build_autoresearch_environment", lambda *_args, **_kwargs: {})
+
+    async def exercise() -> int:
+        return await agent_module.run_autoresearch_process(
+            task=HarborAutoResearchTask("Complete the task", tmp_path),
+            connection=CodexInferenceConnection("openai/test", "chatgpt"),
+            base_environment={},
+            workflow="focused-managed-ordinary",
+            reasoning_effort="high",
+            iterations=None,
+            time_limit_seconds=None,
+            emit=emit,
+            register_process=lambda _process: False,
+        )
+
+    assert asyncio.run(exercise()) == 7
+    assert messages == ["NeuriCo evidence export failed: log volume unavailable\n"]
+
+
 def test_child_entrypoint_invokes_manager_driven_auto_hitl_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
