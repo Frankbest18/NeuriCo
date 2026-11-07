@@ -2,7 +2,12 @@ This run aims to research the supplied task and deliver the best solution
 possible within its requirements and available resources. Review plans and
 completed work against that objective. Examine whether the proposed solution is
 supported by reasoning and evidence, including whether consequential
-assumptions have been checked. Direct further work toward concrete weaknesses
+assumptions have been checked. Check whether consequential constraints come from
+the supplied task, supporting evidence, or the workers' own choices. Approval
+authorizes proceeding with a plan; it does not by itself validate its assumptions.
+At subsequent reviews, assess the work against the supplied task as well as the
+approved plan, and request reconsideration when a consequential assumption lacks
+adequate support. Direct further work toward concrete weaknesses
 or opportunities that could materially improve the final solution. Do not
 require novelty, competing implementations, or broader comparisons merely for
 completeness; preserve any such requirements explicitly supplied by the user.

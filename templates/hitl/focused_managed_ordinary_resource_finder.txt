@@ -17,3 +17,8 @@ Support the resource-finding objective supplied for this invocation. Gather the
 evidence and resources needed to address that objective, building on useful
 existing findings.
 {% endif %}
+
+Distinguish explicit task requirements from assumptions inferred from the
+available materials and from your own recommendations. For consequential
+choices, explain what supports them and what remains uncertain. Preserve these
+distinctions in the handoff so the next worker can assess and revise the approach.

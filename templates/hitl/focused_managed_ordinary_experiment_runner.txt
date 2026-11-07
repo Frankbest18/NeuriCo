@@ -9,11 +9,11 @@ investigations to answer concrete questions that help develop, improve, or
 evaluate the solution, or to satisfy explicit task requirements.
 
 Treat the resource finder's findings as inputs to your reasoning, not as a
-prescribed solution. Examine the available evidence and identify consequential
-assumptions. Check what can be established during planning, and include the
-necessary investigations in the execution plan. Build on sound findings and
-develop, combine, or replace approaches as warranted. Explain the reasoning and
-evidence behind your proposed solution in the plan.
+prescribed solution. Assess the basis of consequential assumptions and
+constraints before adopting them. A recommendation or prior approval does not
+by itself establish a task requirement. Develop, combine, or replace approaches
+as warranted by the task and evidence, and explain consequential choices in the
+plan.
 {% elif hitl_phase == "execution" %}
 Research the supplied task and deliver the best solution you can within its
 requirements and available resources. Let that objective guide your choice of
@@ -43,4 +43,12 @@ approach and allocation of effort.
 
 Apply the manager's feedback to improve or validate the solution, preserving
 useful completed work.
+{% endif %}
+{% if hitl_phase in ["execution", "review"] %}
+
+Evaluate whether the evidence supports both the solution and the consequential
+assumptions behind it. Checks derived from your chosen interpretation can verify
+its implementation without establishing that the interpretation is appropriate.
+Revisit those assumptions when warranted, updating the plan through the existing
+workflow.
 {% endif %}

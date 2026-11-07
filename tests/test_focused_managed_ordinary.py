@@ -155,7 +155,8 @@ def test_focused_ordinary_experiment_prompts_are_solution_oriented_and_unscored(
     }
 
     assert "Treat the resource finder's findings as inputs" in prompts["plan"]
-    assert "develop, combine, or replace approaches as warranted" in prompts["plan"]
+    assert "Develop, combine, or replace approaches" in prompts["plan"]
+    assert "by itself establish a task requirement" in prompts["plan"]
     assert "Each experiment should help develop, improve, or evaluate the solution" in prompts[
         "execution"
     ]
@@ -167,6 +168,10 @@ def test_focused_ordinary_experiment_prompts_are_solution_oriented_and_unscored(
     for prompt in prompts.values():
         assert "scoring/interface.md" not in prompt
         assert "selected direction" not in prompt.lower()
+    for phase in ("execution", "review"):
+        assert prompts[phase].count("Checks derived from your chosen interpretation") == 1
+        assert "updating the plan through the existing" in prompts[phase]
+    assert "Checks derived from your chosen interpretation" not in prompts["plan"]
 
 
 def test_autoresearch_and_unfocused_ordinary_keep_their_existing_prompt_branches(tmp_path):
@@ -231,6 +236,68 @@ def test_resource_finder_uses_distinct_bootstrap_and_additional_contracts():
     assert "established managed research workspace" in additional
     assert "DIRECTION BUDGET" not in bootstrap
     assert "DIRECTION BUDGET" not in additional
+
+
+@pytest.mark.parametrize("phase", ["plan", "execution", "review"])
+@pytest.mark.parametrize("invocation_mode", ["bootstrap", "additive"])
+def test_resource_finder_preserves_requirement_and_assumption_distinction(phase, invocation_mode):
+    generator = PromptGenerator(ROOT / "templates")
+    kwargs = dict(
+        hitl_runtime_completion=True,
+        hitl_phase=phase,
+        invocation_mode=invocation_mode,
+    )
+    prompt = generator.generate_resource_finder_prompt(
+        IDEA, focused_managed_ordinary=True, **kwargs
+    )
+    assert prompt.count("Distinguish explicit task requirements from assumptions") == 1
+    assert "distinctions in the handoff" in prompt
+    for focused in (False, True):
+        legacy = generator.generate_resource_finder_prompt(
+            IDEA, focused_autoresearch=focused, **kwargs
+        )
+        assert "Distinguish explicit task requirements from assumptions" not in legacy
+
+
+@pytest.mark.parametrize("mode", ["auto", "full"])
+@pytest.mark.parametrize("stage", ["resource_finder", "experiment_runner"])
+@pytest.mark.parametrize("phase", ["plan", "execution", "raised"])
+@pytest.mark.parametrize("focused", [False, True])
+def test_manager_reviews_assumptions_without_changing_authority(
+    tmp_path, mode, stage, phase, focused
+):
+    _ordinary(tmp_path, focused)
+    manager = HitlManager.__new__(HitlManager)
+    manager.work_dir = tmp_path
+    manager.request_worker_resolution = lambda **kwargs: kwargs["prompt"]
+    if phase == "raised":
+        prompt = manager.review_raised_idea(
+            pipeline_stage=stage,
+            raised_idea={"idea_type": "evidence", "actor": stage, "hitl_stage": "execution"},
+            plan_text="Plan",
+            hitl_mode=mode,
+        )
+    else:
+        prompt = manager.review_phase_finish(
+            pipeline_stage=stage,
+            hitl_stage=phase,
+            plan_text="Plan",
+            finish_summary="Ready",
+            related_artifacts=[],
+            request_key="request-key",
+            requires_human_approval=mode == "full",
+            hitl_mode=mode,
+        )
+    assert prompt.count("it does not by itself validate its assumptions") == int(focused)
+    if focused:
+        assert "the supplied task, supporting evidence, or the workers' own choices" in prompt
+    if phase == "plan":
+        if mode == "auto":
+            assert "final B-level plan authority" in prompt
+        else:
+            assert "Approve plan." in prompt
+    if stage == "resource_finder" and phase != "raised":
+        assert "mandatory pipeline artifacts" in prompt
 
 
 @pytest.mark.parametrize("phase", ["plan", "execution", "review"])
