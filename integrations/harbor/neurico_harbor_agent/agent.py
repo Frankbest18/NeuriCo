@@ -63,6 +63,7 @@ _TIME_LIMIT_EXIT_CODE = 124
 _COOPERATIVE_SHUTDOWN_GRACE_SECONDS = 30.0
 _CANCELLATION_GRACE_SECONDS = 30.0
 _FORCED_TERMINATION_GRACE_SECONDS = 5.0
+_HARBOR_EVIDENCE_DIR = Path("/logs/agent/neurico")
 HarborWorkflow = Literal["autoresearch", "focused-managed-ordinary"]
 ReasoningEffort = Literal["low", "medium", "high", "xhigh"]
 
@@ -109,6 +110,74 @@ def _reasoning_effort(environment: dict[str, str]) -> ReasoningEffort | None:
             "NEURICO_HARBOR_REASONING_EFFORT must be low, medium, high, or xhigh"
         )
     return raw
+
+
+def _copy_evidence_file(source: Path, destination: Path) -> None:
+    if not source.is_file() or source.is_symlink():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+
+def export_neurico_evidence(
+    *,
+    workspace: Path,
+    ideas_dir: Path,
+    destination: Path,
+) -> None:
+    """Copy the existing NeuriCo run records needed for Harbor analysis."""
+    workspace = workspace.resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+
+    for source in ideas_dir.glob("*/*.yaml"):
+        _copy_evidence_file(
+            source,
+            destination / "idea_registry" / source.relative_to(ideas_dir),
+        )
+
+    explicit_workspace_files = (
+        ".neurico/pipeline_state.json",
+        ".neurico/pipeline_results.json",
+        ".neurico/research_state.json",
+        ".neurico/hitl/manager/context.jsonl",
+        ".neurico/hitl/idea/idea.jsonl",
+        ".neurico/hitl/whiteboard/whiteboard.json",
+        "literature_review.md",
+        "resources.md",
+        "planning.md",
+        "REPORT.md",
+    )
+    for relative_path in explicit_workspace_files:
+        source = workspace / relative_path
+        _copy_evidence_file(source, destination / relative_path)
+
+    logs_dir = workspace / "logs"
+    if logs_dir.is_dir() and not logs_dir.is_symlink():
+        for source in logs_dir.rglob("*"):
+            if source.suffix in {".txt", ".log", ".jsonl"}:
+                _copy_evidence_file(
+                    source,
+                    destination / "logs" / source.relative_to(logs_dir),
+                )
+
+    plans_dir = workspace / "plans"
+    if plans_dir.is_dir() and not plans_dir.is_symlink():
+        for source in plans_dir.glob("*.md"):
+            _copy_evidence_file(
+                source,
+                destination / "plans" / source.name,
+            )
+
+    manager_dir = workspace / ".neurico" / "hitl" / "manager"
+    history_path = manager_dir / "history.sqlite"
+    if history_path.is_file() and not history_path.is_symlink():
+        from core.hitl_manager_history import HitlManagerHistory
+
+        with HitlManagerHistory.snapshot_lock(manager_dir):
+            _copy_evidence_file(
+                history_path,
+                destination / ".neurico" / "hitl" / "manager" / "history.sqlite",
+            )
 
 
 def _autoresearch_iterations(environment: dict[str, str]) -> int:
@@ -241,35 +310,53 @@ async def run_autoresearch_process(
             if time_limit_seconds is not None:
                 command.extend(["--time-limit-seconds", str(time_limit_seconds)])
 
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            cwd=task.workspace,
-            env=environment,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            start_new_session=True,
-        )
-        cancelled_before_registration = register_process(process)
-        if cancelled_before_registration:
-            await _terminate_process_tree(
-                process,
-                request_cooperative_stop=True,
-            )
-            return process.returncode if process.returncode is not None else 1
-        if time_limit_seconds is None:
-            return await _stream_process_output(process, emit)
+        process: asyncio.subprocess.Process | None = None
         try:
-            return await asyncio.wait_for(
-                _stream_process_output(process, emit),
-                timeout=time_limit_seconds + _COOPERATIVE_SHUTDOWN_GRACE_SECONDS,
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=task.workspace,
+                env=environment,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                start_new_session=True,
             )
-        except TimeoutError:
-            await emit(
-                "NeuriCo did not finish cooperative deadline cleanup within "
-                f"{_COOPERATIVE_SHUTDOWN_GRACE_SECONDS:g} seconds; terminating its process tree.\n"
-            )
-            await _terminate_process_tree(process)
-            return 1
+            cancelled_before_registration = register_process(process)
+            if cancelled_before_registration:
+                await _terminate_process_tree(
+                    process,
+                    request_cooperative_stop=True,
+                )
+                return process.returncode if process.returncode is not None else 1
+            if time_limit_seconds is None:
+                return await _stream_process_output(process, emit)
+            try:
+                return await asyncio.wait_for(
+                    _stream_process_output(process, emit),
+                    timeout=time_limit_seconds + _COOPERATIVE_SHUTDOWN_GRACE_SECONDS,
+                )
+            except TimeoutError:
+                await emit(
+                    "NeuriCo did not finish cooperative deadline cleanup within "
+                    f"{_COOPERATIVE_SHUTDOWN_GRACE_SECONDS:g} seconds; terminating its process tree.\n"
+                )
+                await _terminate_process_tree(process)
+                return 1
+        except BaseException:
+            if process is not None and process.returncode is None:
+                await _terminate_process_tree(process)
+            raise
+        finally:
+            try:
+                export_neurico_evidence(
+                    workspace=task.workspace,
+                    ideas_dir=ideas_dir,
+                    destination=_HARBOR_EVIDENCE_DIR,
+                )
+            except Exception as error:
+                try:
+                    await emit(f"NeuriCo evidence export failed: {error}\n")
+                except Exception:
+                    pass
 
 
 class NeuricoHarborAgent(Agent):

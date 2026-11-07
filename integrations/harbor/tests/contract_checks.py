@@ -1,6 +1,7 @@
 import asyncio
 import os
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -19,6 +20,7 @@ from neurico_harbor_agent.agent import (
     _autoresearch_time_limit,
     _harbor_workflow,
     _reasoning_effort,
+    export_neurico_evidence,
     _stream_process_output,
     _terminate_process_tree,
     _text_from_prompt,
@@ -155,6 +157,53 @@ def test_environment_exposes_locked_codex_and_isolated_home(tmp_path: Path) -> N
 
 def test_codex_runtime_pin_matches_study_version() -> None:
     assert CODEX_VERSION == "0.167.0"
+
+
+def test_evidence_export_copies_whitelist_and_excludes_secrets(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    ideas_dir = tmp_path / "ideas"
+    destination = tmp_path / "evidence"
+    (ideas_dir / "completed").mkdir(parents=True)
+    (ideas_dir / "completed" / "idea.yaml").write_text("idea: {}\n")
+    manager_dir = workspace / ".neurico" / "hitl" / "manager"
+    manager_dir.mkdir(parents=True)
+    (workspace / ".neurico" / "pipeline_state.json").write_text("{}\n")
+    (workspace / "logs").mkdir()
+    (workspace / "logs" / "execution_codex.log").write_text("worker output\n")
+    (workspace / "plans").mkdir()
+    (workspace / "plans" / "experiment_runner_plan.md").write_text("# Plan\n")
+    (workspace / "planning.md").write_text("# Working plan\n")
+    (manager_dir / "manager.token").write_text("secret")
+    (workspace / "logs" / "secret.key").write_text("secret")
+    from core.hitl_manager_history import HitlManagerHistory
+
+    history = HitlManagerHistory(manager_dir)
+    history.append(
+        {
+            "id": "message-1",
+            "type": "message",
+            "speaker": "manager",
+            "content": "Review complete",
+            "timestamp": "2026-11-07T00:00:00Z",
+        }
+    )
+
+    export_neurico_evidence(
+        workspace=workspace,
+        ideas_dir=ideas_dir,
+        destination=destination,
+    )
+
+    assert (destination / "idea_registry" / "completed" / "idea.yaml").is_file()
+    assert (destination / ".neurico" / "pipeline_state.json").is_file()
+    assert (destination / "logs" / "execution_codex.log").is_file()
+    assert (destination / "plans" / "experiment_runner_plan.md").is_file()
+    assert (destination / "planning.md").is_file()
+    copied_history = destination / ".neurico" / "hitl" / "manager" / "history.sqlite"
+    with sqlite3.connect(copied_history) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM conversation_records").fetchone() == (1,)
+    assert not (destination / ".neurico" / "hitl" / "manager" / "manager.token").exists()
+    assert not (destination / "logs" / "secret.key").exists()
 
 
 def test_iteration_override_must_be_positive() -> None:
