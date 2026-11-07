@@ -16,6 +16,7 @@ from neurico_harbor_agent.agent import (
     NeuricoHarborAgent,
     _autoresearch_iterations,
     _autoresearch_time_limit,
+    _harbor_workflow,
     _stream_process_output,
     _terminate_process_tree,
     _text_from_prompt,
@@ -32,6 +33,19 @@ from neurico_harbor_agent.runtime import (
 def test_prompt_text_is_preserved_verbatim() -> None:
     instruction = "First line\n\n  indented line with : and #\n"
     assert _text_from_prompt([{"type": "text", "text": instruction}]) == instruction
+
+
+def test_harbor_workflow_defaults_to_autoresearch_and_validates_override() -> None:
+    assert _harbor_workflow({}) == "autoresearch"
+    assert _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": "autoresearch"}) == "autoresearch"
+    assert (
+        _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": "focused-managed-ordinary"})
+        == "focused-managed-ordinary"
+    )
+    with pytest.raises(ValueError, match="NEURICO_HARBOR_WORKFLOW"):
+        _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": ""})
+    with pytest.raises(ValueError, match="NEURICO_HARBOR_WORKFLOW"):
+        _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": "ordinary"})
 
 
 def test_harbor_instruction_uses_neurico_idea_contract(tmp_path: Path) -> None:

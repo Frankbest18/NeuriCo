@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from acp import (
@@ -63,6 +63,7 @@ _TIME_LIMIT_EXIT_CODE = 124
 _COOPERATIVE_SHUTDOWN_GRACE_SECONDS = 30.0
 _CANCELLATION_GRACE_SECONDS = 30.0
 _FORCED_TERMINATION_GRACE_SECONDS = 5.0
+HarborWorkflow = Literal["autoresearch", "focused-managed-ordinary"]
 
 
 @dataclass
@@ -86,6 +87,16 @@ def _text_from_prompt(prompt: list[ContentBlock]) -> str:
             {"prompt": "NeuriCo's Harbor adapter requires a text instruction"}
         )
     return "".join(text_parts)
+
+
+def _harbor_workflow(environment: dict[str, str]) -> HarborWorkflow:
+    raw = environment.get("NEURICO_HARBOR_WORKFLOW", "autoresearch")
+    if raw not in {"autoresearch", "focused-managed-ordinary"}:
+        raise ValueError(
+            "NEURICO_HARBOR_WORKFLOW must be 'autoresearch' or "
+            "'focused-managed-ordinary'"
+        )
+    return raw
 
 
 def _autoresearch_iterations(environment: dict[str, str]) -> int:
