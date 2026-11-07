@@ -57,6 +57,7 @@ def execute_autoresearch(
     ideas_dir: Path,
     iterations: int = 1,
     time_limit_seconds: int | None = None,
+    domain: str | None = None,
 ) -> dict[str, Any]:
     """Submit a Harbor task through NeuriCo and run headless Auto HITL AutoResearch."""
     if iterations < 1:
@@ -68,7 +69,9 @@ def execute_autoresearch(
 
     task = HarborAutoResearchTask(instruction=instruction, workspace=workspace)
     idea_manager = IdeaManager(ideas_dir)
-    idea_id = idea_manager.submit_idea(build_harbor_idea(task), validate=True)
+    idea_id = idea_manager.submit_idea(
+        build_harbor_idea(task, domain=domain), validate=True
+    )
 
     # The idea metadata points at Harbor's existing repository, so the local
     # runner selects it as the authoritative AutoResearch workspace. A direct
@@ -116,12 +119,15 @@ def execute_focused_managed_ordinary(
     instruction: str,
     workspace: Path,
     ideas_dir: Path,
+    domain: str | None = None,
 ) -> dict[str, Any]:
     """Run one Harbor task through focused managed ordinary research."""
     task = HarborAutoResearchTask(instruction=instruction, workspace=workspace)
     idea_manager = IdeaManager(ideas_dir)
     idea_id = idea_manager.submit_idea(
-        build_harbor_idea(task, workflow="focused-managed-ordinary"),
+        build_harbor_idea(
+            task, workflow="focused-managed-ordinary", domain=domain
+        ),
         validate=True,
     )
 
@@ -157,6 +163,7 @@ def main() -> None:
     )
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--time-limit-seconds", type=int)
+    parser.add_argument("--domain")
     args = parser.parse_args()
 
     stop_requested = threading.Event()
@@ -182,12 +189,14 @@ def main() -> None:
                 ideas_dir=args.ideas_dir,
                 iterations=args.iterations,
                 time_limit_seconds=args.time_limit_seconds,
+                domain=args.domain,
             )
         else:
             result = execute_focused_managed_ordinary(
                 instruction=instruction,
                 workspace=args.workspace,
                 ideas_dir=args.ideas_dir,
+                domain=args.domain,
             )
     finally:
         finished.set()

@@ -209,6 +209,7 @@ def build_harbor_idea(
     task: HarborAutoResearchTask,
     *,
     workflow: Literal["autoresearch", "focused-managed-ordinary"] = "autoresearch",
+    domain: str | None = None,
 ) -> dict[str, Any]:
     """Use NeuriCo's local converter to wrap a Harbor instruction as an idea.
 
@@ -227,6 +228,8 @@ def build_harbor_idea(
         }
     )["parsed"]
     idea = converted["idea"]
+    if domain is not None:
+        idea["domain"] = domain
     metadata = idea.setdefault("metadata", {})
     metadata.update(
         {

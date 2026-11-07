@@ -19,6 +19,7 @@ from neurico_harbor_agent.agent import (
     NeuricoHarborAgent,
     _autoresearch_iterations,
     _autoresearch_time_limit,
+    _harbor_domain,
     _harbor_workflow,
     _reasoning_effort,
     export_neurico_evidence,
@@ -64,6 +65,16 @@ def test_reasoning_effort_is_optional_and_validated() -> None:
         _reasoning_effort({"NEURICO_HARBOR_REASONING_EFFORT": "maximum"})
 
 
+def test_harbor_domain_is_optional_and_validated() -> None:
+    assert _harbor_domain({}) is None
+    assert (
+        _harbor_domain({"NEURICO_HARBOR_DOMAIN": "software_maintenance"})
+        == "software_maintenance"
+    )
+    with pytest.raises(ValueError, match="NEURICO_HARBOR_DOMAIN"):
+        _harbor_domain({"NEURICO_HARBOR_DOMAIN": "unknown-domain"})
+
+
 def test_harbor_instruction_uses_neurico_idea_contract(tmp_path: Path) -> None:
     instruction = "# Compare cache policies\n\nTest LRU and LFU on the supplied workload.\n"
     task = HarborAutoResearchTask(instruction=instruction, workspace=tmp_path)
@@ -87,6 +98,15 @@ def test_focused_managed_ordinary_idea_uses_mode_correct_labels(tmp_path: Path) 
         "harbor",
         "focused-managed-ordinary",
     ]
+
+
+def test_explicit_harbor_domain_preserves_instruction(tmp_path: Path) -> None:
+    instruction = "Repair the supplied implementation exactly as requested.\n"
+    task = HarborAutoResearchTask(instruction=instruction, workspace=tmp_path)
+    result = build_harbor_idea(task, domain="software_maintenance")
+
+    assert result["idea"]["domain"] == "software_maintenance"
+    assert result["idea"]["background"]["description"] == instruction
 
 
 @pytest.mark.parametrize("workflow", ["autoresearch", "focused-managed-ordinary"])
@@ -682,6 +702,7 @@ def test_output_stream_failure_cleans_process_before_evidence_export(
                 connection=CodexInferenceConnection("openai/test", "chatgpt"),
                 base_environment={},
                 workflow="focused-managed-ordinary",
+                domain=None,
                 reasoning_effort="high",
                 iterations=None,
                 time_limit_seconds=None,
@@ -727,6 +748,7 @@ def test_evidence_export_failure_preserves_child_exit_status(
             connection=CodexInferenceConnection("openai/test", "chatgpt"),
             base_environment={},
             workflow="focused-managed-ordinary",
+            domain=None,
             reasoning_effort="high",
             iterations=None,
             time_limit_seconds=None,
@@ -824,6 +846,7 @@ def test_child_entrypoint_invokes_focused_managed_ordinary_runner(
         instruction="Implement the supplied benchmark task.",
         workspace=tmp_path,
         ideas_dir=tmp_path / "ideas",
+        domain="software_maintenance",
     )
 
     assert result["success"] is True
@@ -834,6 +857,7 @@ def test_child_entrypoint_invokes_focused_managed_ordinary_runner(
         "harbor",
         "focused-managed-ordinary",
     ]
+    assert captured["idea"]["idea"]["domain"] == "software_maintenance"
     assert captured["run"] == {
         "idea_id": "harbor-idea",
         "provider": "codex",
@@ -999,6 +1023,7 @@ def test_acp_prompt_launches_focused_managed_ordinary_without_autoresearch_contr
                 "NEURICO_CODEX_AUTH_FILE": str(auth_file),
                 "NEURICO_HARBOR_WORKFLOW": "focused-managed-ordinary",
                 "NEURICO_HARBOR_REASONING_EFFORT": "high",
+                "NEURICO_HARBOR_DOMAIN": "software_maintenance",
                 "NEURICO_HARBOR_AUTORESEARCH_ITERATIONS": "invalid but unused",
                 "NEURICO_HARBOR_TIME_LIMIT_SECONDS": "invalid but unused",
             }
@@ -1012,6 +1037,7 @@ def test_acp_prompt_launches_focused_managed_ordinary_without_autoresearch_contr
 
     asyncio.run(run_prompt())
     assert captured["workflow"] == "focused-managed-ordinary"
+    assert captured["domain"] == "software_maintenance"
     assert captured["reasoning_effort"] == "high"
     assert captured["iterations"] is None
     assert captured["time_limit_seconds"] is None

@@ -103,6 +103,17 @@ def _harbor_workflow(environment: dict[str, str]) -> HarborWorkflow:
     return raw
 
 
+def _harbor_domain(environment: dict[str, str]) -> str | None:
+    raw = environment.get("NEURICO_HARBOR_DOMAIN")
+    if raw is None:
+        return None
+    from src.core.config_loader import ConfigLoader
+
+    if not ConfigLoader().is_domain_valid(raw):
+        raise ValueError("NEURICO_HARBOR_DOMAIN must name a configured NeuriCo domain")
+    return raw
+
+
 def _reasoning_effort(environment: dict[str, str]) -> ReasoningEffort | None:
     raw = environment.get("NEURICO_HARBOR_REASONING_EFFORT")
     if raw is None:
@@ -279,6 +290,7 @@ async def run_autoresearch_process(
     connection: CodexInferenceConnection,
     base_environment: dict[str, str],
     workflow: HarborWorkflow,
+    domain: str | None,
     reasoning_effort: ReasoningEffort | None,
     iterations: int | None,
     time_limit_seconds: int | None,
@@ -316,6 +328,8 @@ async def run_autoresearch_process(
             "--workflow",
             workflow,
         ]
+        if domain is not None:
+            command.extend(["--domain", domain])
         if workflow == "autoresearch":
             assert iterations is not None
             command.extend(["--iterations", str(iterations)])
@@ -524,6 +538,7 @@ class NeuricoHarborAgent(Agent):
             requested_model=session.model,
         )
         workflow = _harbor_workflow(self._environment)
+        domain = _harbor_domain(self._environment)
         reasoning_effort = _reasoning_effort(self._environment)
         iterations = (
             _autoresearch_iterations(self._environment) if workflow == "autoresearch" else None
@@ -544,6 +559,7 @@ class NeuricoHarborAgent(Agent):
                 connection=connection,
                 base_environment=self._environment,
                 workflow=workflow,
+                domain=domain,
                 reasoning_effort=reasoning_effort,
                 iterations=iterations,
                 time_limit_seconds=time_limit_seconds,

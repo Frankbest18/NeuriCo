@@ -18,6 +18,10 @@ input.
 - `NEURICO_HARBOR_WORKFLOW` selects `autoresearch` or
   `focused-managed-ordinary`. If it is absent, the adapter preserves its
   existing `autoresearch` behavior.
+- `NEURICO_HARBOR_DOMAIN` optionally selects an explicitly configured NeuriCo
+  domain for the generated idea. It is never inferred from Harbor or the task
+  text. If absent, idea conversion preserves its existing domain behavior; an
+  invalid value fails before research starts.
 - In `autoresearch`, NeuriCo runs fresh manager-driven HITL AutoResearch in
   Auto mode. The manager
   reviews resource-finder, rule-maker, experiment, and scoring boundaries and
@@ -116,6 +120,8 @@ agents:
       NEURICO_CODEX_AUTH_FILE: /run/secrets/neurico-codex-auth.json
       NEURICO_HARBOR_WORKFLOW: focused-managed-ordinary
       NEURICO_HARBOR_REASONING_EFFORT: high
+      # Optional opt-in intervention:
+      # NEURICO_HARBOR_DOMAIN: software_maintenance
     kwargs:
       source:
         repo_url: https://github.com/ChicagoHAI/neurico
