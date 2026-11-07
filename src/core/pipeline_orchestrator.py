@@ -1227,6 +1227,7 @@ class ResearchPipelineOrchestrator:
                                     full_permissions=full_permissions,
                                     use_scribe=use_scribe,
                                     scoring_enabled=scoring_enabled,
+                                    benchmark_mode=benchmark_mode,
                                     scorer_timeout=scorer_timeout,
                                     sealed_dir=sealed_dir,
                                 ),
@@ -2056,6 +2057,7 @@ class ResearchPipelineOrchestrator:
         use_scribe: bool,
         scoring_enabled: bool,
         hitl_phase: str,
+        benchmark_mode: bool = False,
     ) -> str:
         """Render exactly one source context for an experiment-runner HITL phase."""
         from templates.prompt_generator import PromptGenerator
@@ -2089,6 +2091,7 @@ class ResearchPipelineOrchestrator:
                     self.focused_autoresearch if self.hitl_autoresearch else False
                 ),
                 focused_managed_ordinary=self.focused_managed_ordinary,
+                benchmark_mode=(benchmark_mode and not self.hitl_autoresearch),
             )
             return apply_focused_scope(
                 generate_instructions(
@@ -2103,6 +2106,7 @@ class ResearchPipelineOrchestrator:
                         self.focused_autoresearch if self.hitl_autoresearch else False
                     ),
                     focused_managed_ordinary=self.focused_managed_ordinary,
+                    benchmark_mode=(benchmark_mode and not self.hitl_autoresearch),
                 )
             )
         if hitl_phase not in {"plan", "review"}:
@@ -2127,10 +2131,13 @@ class ResearchPipelineOrchestrator:
         self,
         *,
         scoring_enabled: bool,
+        benchmark_mode: bool = False,
     ) -> Optional[Callable[[], Dict[str, Any]]]:
         """Return the existing completion contract for this experiment workflow."""
         if scoring_enabled:
             return lambda: validate_required_artifact_contract(self.work_dir)
+        if benchmark_mode:
+            return None
         if not (self.managed_initial_run and not self.hitl_autoresearch):
             return None
 
@@ -2161,6 +2168,7 @@ class ResearchPipelineOrchestrator:
         full_permissions: bool,
         use_scribe: bool = False,
         scoring_enabled: bool = False,
+        benchmark_mode: bool = False,
         scorer_timeout: Optional[int] = 600,
         sealed_dir: Optional[Path] = None,
     ) -> Dict[str, Any]:
@@ -2177,7 +2185,7 @@ class ResearchPipelineOrchestrator:
         if not self._initial_stage_request("experiment_runner"):
             self.state.start_stage(
                 "experiment_runner",
-                expected_outputs=["REPORT.md"] if managed_ordinary else None,
+                expected_outputs=["REPORT.md"] if managed_ordinary and not benchmark_mode else None,
             )
         runtime = self._create_hitl_runtime("experiment_runner")
         worker_prompt_contexts = {
@@ -2187,6 +2195,7 @@ class ResearchPipelineOrchestrator:
                 use_scribe=use_scribe,
                 scoring_enabled=scoring_enabled,
                 hitl_phase=phase,
+                benchmark_mode=benchmark_mode,
             )
             for phase in ("plan", "execution", "review")
         }
@@ -2201,7 +2210,8 @@ class ResearchPipelineOrchestrator:
         scored_checkpoint_sha: Optional[str] = None
 
         artifact_validator = self._experiment_runner_artifact_validator(
-            scoring_enabled=scoring_enabled
+            scoring_enabled=scoring_enabled,
+            benchmark_mode=benchmark_mode,
         )
 
         def restore_failed_hitl_state() -> None:
