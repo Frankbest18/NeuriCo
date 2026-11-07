@@ -21,7 +21,10 @@ from neurico_harbor_agent.agent import (
     _terminate_process_tree,
     _text_from_prompt,
 )
-from neurico_harbor_agent.run_autoresearch import execute_autoresearch
+from neurico_harbor_agent.run_autoresearch import (
+    execute_autoresearch,
+    execute_focused_managed_ordinary,
+)
 from neurico_harbor_agent.runtime import (
     CodexInferenceConnection,
     HarborAutoResearchTask,
@@ -60,6 +63,17 @@ def test_harbor_instruction_uses_neurico_idea_contract(tmp_path: Path) -> None:
     assert idea["metadata"]["source"] == "harbor"
     assert idea["metadata"]["local_workspace"] == str(tmp_path)
     assert len(idea["metadata"]["instruction_sha256"]) == 64
+
+
+def test_focused_managed_ordinary_idea_uses_mode_correct_labels(tmp_path: Path) -> None:
+    task = HarborAutoResearchTask(instruction="Fix it", workspace=tmp_path)
+    result = build_harbor_idea(task, workflow="focused-managed-ordinary")
+
+    assert result["idea"]["title"].startswith("Harbor focused managed ordinary research")
+    assert result["idea"]["metadata"]["tags"] == [
+        "harbor",
+        "focused-managed-ordinary",
+    ]
 
 
 def test_hosted_gateway_uses_neutral_credential_and_full_model(tmp_path: Path) -> None:
@@ -507,6 +521,63 @@ def test_child_entrypoint_invokes_manager_driven_auto_hitl_runner(
     assert "autoresearch" not in captured["run"]
 
 
+def test_child_entrypoint_invokes_focused_managed_ordinary_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeManager:
+        def __init__(self, ideas_dir: Path):
+            captured["ideas_dir"] = ideas_dir
+
+        def submit_idea(self, idea: dict[str, Any], validate: bool) -> str:
+            captured["idea"] = idea
+            captured["validate"] = validate
+            return "harbor-idea"
+
+    class FakeRunner:
+        def __init__(self, *, use_github: bool):
+            captured["use_github"] = use_github
+
+        def run_research(self, **kwargs: Any) -> dict[str, Any]:
+            captured["run"] = kwargs
+            captured["control"] = runner_module.active_hitl_run_stop_control()
+            return {"success": True, "work_dir": str(tmp_path)}
+
+    monkeypatch.setattr(runner_module, "IdeaManager", FakeManager)
+    monkeypatch.setattr(runner_module, "ResearchRunner", FakeRunner)
+
+    result = execute_focused_managed_ordinary(
+        instruction="Implement the supplied benchmark task.",
+        workspace=tmp_path,
+        ideas_dir=tmp_path / "ideas",
+    )
+
+    assert result["success"] is True
+    assert captured["validate"] is True
+    assert captured["control"] is not None
+    assert captured["control"].work_dir == tmp_path
+    assert captured["idea"]["idea"]["metadata"]["tags"] == [
+        "harbor",
+        "focused-managed-ordinary",
+    ]
+    assert captured["run"] == {
+        "idea_id": "harbor-idea",
+        "provider": "codex",
+        "full_permissions": True,
+        "multi_agent": True,
+        "use_scribe": False,
+        "write_paper": False,
+        "scoring_enabled": False,
+        "benchmark_mode": True,
+        "hitl_research": "cli",
+        "hitl_manager_no_browser": True,
+        "hitl_mode": "auto",
+        "focused_autoresearch": True,
+        "workspace_mode": "embedded",
+    }
+
+
 def test_child_translates_native_budget_stop_after_neurico_finalization(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -626,11 +697,48 @@ def test_acp_prompt_launches_autoresearch_not_direct_inference(
     asyncio.run(run_prompt())
     assert captured["task"].instruction == instruction
     assert captured["task"].workspace == tmp_path
+    assert captured["workflow"] == "autoresearch"
     assert captured["iterations"] == 1
     assert captured["time_limit_seconds"] == 1740
     assert captured["connection"].backend_model == "test-model"
     assert captured["connection"].mode == "chatgpt"
     assert task_venv.read_text() == "owned by task\n"
+
+
+def test_acp_prompt_launches_focused_managed_ordinary_without_autoresearch_controls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_runner(**kwargs: Any) -> int:
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(agent_module, "run_autoresearch_process", fake_runner)
+
+    async def run_prompt() -> None:
+        auth_file = tmp_path / "auth.json"
+        auth_file.write_text('{"tokens": {}}')
+        agent = NeuricoHarborAgent(
+            {
+                "NEURICO_MODEL": "openai/test-model",
+                "NEURICO_CODEX_AUTH_FILE": str(auth_file),
+                "NEURICO_HARBOR_WORKFLOW": "focused-managed-ordinary",
+                "NEURICO_HARBOR_AUTORESEARCH_ITERATIONS": "invalid but unused",
+                "NEURICO_HARBOR_TIME_LIMIT_SECONDS": "invalid but unused",
+            }
+        )
+        session = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        response = await agent.prompt(
+            session_id=session.session_id,
+            prompt=[{"type": "text", "text": "Implement the supplied task."}],
+        )
+        assert response.stop_reason == "end_turn"
+
+    asyncio.run(run_prompt())
+    assert captured["workflow"] == "focused-managed-ordinary"
+    assert captured["iterations"] is None
+    assert captured["time_limit_seconds"] is None
 
 
 def test_autoresearch_failure_fails_the_acp_turn(
