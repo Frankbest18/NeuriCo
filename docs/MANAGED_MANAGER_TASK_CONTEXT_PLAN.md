@@ -1,6 +1,6 @@
 # Managed/HITL manager: complete task context
 
-Status: proposal only; no implementation or new benchmark run.
+Status: implemented and locally validated. No new model-backed benchmark run.
 
 Branch: `harbor-focused-managed-ordinary`, reviewed at `b5bede5`.
 
@@ -299,3 +299,36 @@ artifact-trust heuristics, evaluator knowledge, or research strategy belong in
 this implementation. Implement the core wiring and its tests as a separately
 reviewable commit on the current branch; keep any evidence-export adjustment
 small and explicit.
+
+## Implementation and validation record
+
+Implemented in three local steps: task persistence and shared manager input;
+managed entrypoint and recovery wiring; Harbor evidence export. The source
+changes reuse `HitlRuntimeState` and the existing manager conversation builder.
+The owning pipeline/controller retains the returned binding and supplies a
+small recovery callback to its stage runtime. Manager-only CLI/web startup
+initializes missing context; generic workspace resolution remains unchanged.
+
+Local validation:
+
+- Core tests: 545 passed, including 26 task-context regressions covering
+  managed ordinary/AutoResearch entrypoints, Full/Auto and focused/unfocused
+  pipeline routing, all three proposal modes, compaction, recreation, run
+  budget normalization, and restoration from an actual private Git snapshot.
+- Harbor contracts: 35 passed, 7 Linux-only checks skipped on macOS. New
+  integration checks convert a long Harbor instruction, capture a real manager
+  turn at a fake backend, replace the provider, and compare the exported task
+  with the supplied input. Export also leaves missing runtime state untouched.
+- Changed files pass Ruff except `src/core/runner.py`, whose 25 existing lint
+  findings were confirmed against the pre-change version. No new findings were
+  introduced there. `git diff --check` passes.
+
+Run from this worktree with the existing Harbor development environment:
+
+```sh
+PYTHONPATH="$PWD/src" integrations/harbor/.venv/bin/python -m pytest -q tests
+PYTHONPATH="$PWD:$PWD/src:$PWD/integrations/harbor" integrations/harbor/.venv/bin/python -m pytest -q integrations/harbor/tests/contract_checks.py
+```
+
+The existing cancellation contract needs local process inspection permission.
+These checks make no model calls and do not establish a new benchmark score.

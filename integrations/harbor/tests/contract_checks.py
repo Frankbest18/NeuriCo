@@ -89,6 +89,67 @@ def test_focused_managed_ordinary_idea_uses_mode_correct_labels(tmp_path: Path) 
     ]
 
 
+@pytest.mark.parametrize("workflow", ["autoresearch", "focused-managed-ordinary"])
+def test_harbor_task_reaches_manager_backend_and_evidence(tmp_path, monkeypatch, workflow):
+    from types import SimpleNamespace
+    import yaml
+    from core.hitl_manager_react import HitlManager
+    from core.hitl_runtime_state import HitlRuntimeState
+
+    instruction = "Investigate the supplied package.\n" * 100 + "Required output: /app/final.json\n"
+    task = build_harbor_idea(
+        HarborAutoResearchTask(instruction=instruction, workspace=tmp_path), workflow=workflow,
+    )
+    assert "Required output" not in task["idea"]["hypothesis"]
+    bound = HitlRuntimeState(tmp_path).bind_task_context(task)
+    captured = []
+
+    def send(messages, tools):
+        captured.extend(messages)
+        return SimpleNamespace(text="Review complete", tool_calls=[])
+
+    monkeypatch.setattr(
+        HitlManager, "_backend_for_provider",
+        lambda self, provider: SimpleNamespace(backend="test", send=send),
+    )
+    manager = HitlManager({}, work_dir=tmp_path)
+    manager._run_turn("human", "Review the task.", generation=0)
+    task_message = next(m for m in captured if m["content"].startswith("User-provided research task"))
+    supplied = yaml.safe_load(task_message["content"].split("\n\n", 1)[1])
+    assert supplied == bound
+    assert supplied["idea"]["background"]["description"] == instruction
+    captured.clear()
+    manager.set_provider("codex")
+    manager._run_turn("human", "Continue the review.", generation=0)
+    replacement_message = next(
+        m for m in captured if m["content"].startswith("User-provided research task")
+    )
+    assert yaml.safe_load(replacement_message["content"].split("\n\n", 1)[1]) == supplied
+    runtime_path = tmp_path / ".neurico/hitl/runtime.json"
+    before = runtime_path.read_bytes()
+    export_neurico_evidence(workspace=tmp_path, ideas_dir=tmp_path / "ideas", destination=tmp_path / "export")
+    exported = tmp_path / "export/.neurico/hitl/manager/task_context.json"
+    assert json.loads(exported.read_text()) == supplied
+    assert runtime_path.read_bytes() == before
+    assert not (tmp_path / "export/.neurico/hitl/runtime.json").exists()
+
+
+@pytest.mark.parametrize("runtime_exists", [False, True])
+def test_task_evidence_export_does_not_initialize_missing_context(tmp_path, runtime_exists):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    runtime_path = workspace / ".neurico/hitl/runtime.json"
+    if runtime_exists:
+        runtime_path.parent.mkdir(parents=True)
+        runtime_path.write_text('{"manager_provider": "codex"}')
+    before = {str(p.relative_to(workspace)): p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    destination = tmp_path / "export"
+    export_neurico_evidence(workspace=workspace, ideas_dir=tmp_path / "ideas", destination=destination)
+    after = {str(p.relative_to(workspace)): p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    assert before == after
+    assert not (destination / ".neurico/hitl/manager/task_context.json").exists()
+
+
 @pytest.mark.parametrize("phase", ["plan", "execution", "review"])
 def test_focused_ordinary_workers_receive_complete_harbor_instruction(
     tmp_path: Path, phase: str

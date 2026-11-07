@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import json
 import os
 import signal
 import shutil
@@ -129,6 +130,16 @@ def export_neurico_evidence(
     """Copy the existing NeuriCo run records needed for Harbor analysis."""
     workspace = workspace.resolve()
     destination.mkdir(parents=True, exist_ok=True)
+
+    runtime_path = workspace / ".neurico" / "hitl" / "runtime.json"
+    if runtime_path.is_file() and not runtime_path.is_symlink():
+        task_context = json.loads(runtime_path.read_text(encoding="utf-8")).get("task_context")
+        if task_context is not None:
+            from core.hitl_util import atomic_write_json
+
+            task_path = destination / ".neurico" / "hitl" / "manager" / "task_context.json"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(task_path, task_context, ensure_ascii=False, indent=2)
 
     for source in ideas_dir.glob("*/*.yaml"):
         _copy_evidence_file(
