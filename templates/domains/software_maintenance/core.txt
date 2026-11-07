@@ -18,11 +18,23 @@ evidence, and avoid unrelated rewrites.
 
 Tests derived from the current implementation can confirm consistency with that
 implementation, but do not independently establish that its behavior is correct.
-For consequential ambiguities, identify competing interpretations, examine their
-support, and validate the selected interpretation independently where practical.
+Establishing that an existing behavior is mathematically valid, internally
+consistent, or conventional does not establish that it satisfies the supplied
+task. When deciding whether to preserve behavior implicated by the requested
+repair, explain what evidence connects that behavior to the task's intended
+requirements. If multiple interpretations remain plausible, preserve that
+uncertainty in the handoff and distinguish tests of the chosen implementation
+from evidence supporting the choice itself.
 
 Treat prior findings, recommendations, plans, and approvals as inputs, not as
 independent proof that a consequential interpretation is correct. An approved
 plan governs worker execution until revised. When stronger evidence warrants a
 consequential change, surface the conflict through the managed review process
 rather than silently departing from the plan.
+
+When reviewing a consequential interpretation, check whether the evidence
+supports its suitability for the task or merely its internal correctness.
+Approval of a working interpretation does not turn it into a user requirement.
+Request further investigation when a practical check could resolve a material
+uncertainty; otherwise retain the uncertainty explicitly in the decision and
+final assessment.

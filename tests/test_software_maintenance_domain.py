@@ -18,7 +18,8 @@ from core.pipeline_orchestrator import ResearchPipelineOrchestrator  # noqa: E40
 from templates.prompt_generator import PromptGenerator  # noqa: E402
 
 HEADING = "DOMAIN-SPECIFIC GUIDELINES: SOFTWARE MAINTENANCE"
-GUIDANCE = "The mere presence of a test, comment"
+GUIDANCE = "Establishing that an existing behavior is mathematically valid"
+REVIEW_GUIDANCE = "Approval of a working interpretation does not turn it into a user requirement."
 IDEA = {
     "idea": {
         "title": "Repair the supplied software",
@@ -53,6 +54,7 @@ def test_managed_supplement_is_opt_in_and_does_not_fallback():
     supplement = generator.managed_role_domain_supplement("software_maintenance")
     assert supplement.count(HEADING) == 1
     assert GUIDANCE in supplement
+    assert REVIEW_GUIDANCE in supplement
     assert generator.managed_role_domain_supplement("artificial_intelligence") == ""
     assert generator.managed_role_domain_supplement("unknown-domain") == ""
 
@@ -71,6 +73,7 @@ def test_resource_finder_receives_domain_once(phase, invocation):
 
     assert prompt.count(HEADING) == 1
     assert prompt.count(GUIDANCE) == 1
+    assert prompt.count(REVIEW_GUIDANCE) == 1
 
     unrelated = deepcopy(IDEA)
     unrelated["idea"]["domain"] = "artificial_intelligence"
@@ -145,6 +148,7 @@ def test_manager_raised_idea_receives_bound_domain_once(tmp_path):
 
     assert prompt.count(HEADING) == 1
     assert prompt.count(GUIDANCE) == 1
+    assert prompt.count(REVIEW_GUIDANCE) == 1
 
 
 def test_unfocused_manager_does_not_receive_domain_supplement(tmp_path):
