@@ -6,6 +6,10 @@ the worker should continue with concrete feedback.
 
 {% include "hitl/manager_focused_managed_ordinary.txt" %}
 {% endif %}
+{% if managed_role_domain_supplement %}
+
+{{ managed_role_domain_supplement }}
+{% endif %}
 {% if autoresearch_attempt %}
 
 {% include "hitl/manager_autoresearch_candidate_boundary.txt" %}

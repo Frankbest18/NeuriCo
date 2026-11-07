@@ -116,6 +116,31 @@ class PromptGenerator:
         except FileNotFoundError:
             return self.load_template(template_path)
 
+    def managed_role_domain_supplement(self, domain: str) -> str:
+        """Return an explicitly enabled domain supplement for managed roles.
+
+        This is additive and intentionally does not use the default-domain
+        fallback. Existing domains remain unchanged unless their own config opts
+        into ``managed_role_supplement``.
+        """
+        loader = ConfigLoader()
+        if not loader.is_domain_valid(domain):
+            return ""
+        domain_config = loader.get_domains_config().get("domains", {}).get(domain, {})
+        if not domain_config.get("managed_role_supplement", False):
+            return ""
+        body = self.load_template(f"domains/{domain}/core.txt").strip()
+        if not body:
+            return ""
+        label = domain.upper().replace("_", " ")
+        return "\n".join([
+            "=" * 80,
+            f"           DOMAIN-SPECIFIC GUIDELINES: {label}",
+            "=" * 80,
+            "",
+            body,
+        ])
+
     def load_template(self, template_path: str) -> str:
         """
         Load a template file as plain text.
@@ -1228,6 +1253,9 @@ instruction elsewhere in the resource-finder template.
 """
 
         if focused_managed_ordinary:
+            domain_supplement = self.managed_role_domain_supplement(domain)
+            if domain_supplement:
+                full_prompt += f"\n\n{domain_supplement}\n"
             focused_contract = self.render_template(
                 self.load_template("hitl/focused_managed_ordinary_resource_finder.txt"),
                 {"invocation_mode": invocation_mode},

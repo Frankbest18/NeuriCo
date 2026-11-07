@@ -2095,6 +2095,15 @@ class ResearchPipelineOrchestrator:
             ).strip()
             return f"{prompt.rstrip()}\n\n{contract}\n"
 
+        def apply_managed_domain_scope(prompt: str) -> str:
+            if not self.focused_managed_ordinary:
+                return prompt
+            domain = idea.get("idea", {}).get("domain", "general")
+            supplement = generator.managed_role_domain_supplement(domain)
+            if not supplement:
+                return prompt
+            return f"{prompt.rstrip()}\n\n{supplement}\n"
+
         if hitl_phase == "execution":
             ordinary_prompt = generator.generate_research_prompt(
                 idea,
@@ -2127,17 +2136,19 @@ class ResearchPipelineOrchestrator:
             raise ValueError(f"Unsupported HITL experiment-runner phase: {hitl_phase}")
         interface_path = self.work_dir / "scoring" / "interface.md"
         return apply_focused_scope(
-            generator.render_template(
-                generator.load_template("hitl/experiment_runner_context.txt"),
-                {
-                    "hitl_phase": hitl_phase,
-                    "idea_json": json.dumps(idea, indent=2, default=str),
-                    "scoring_interface": (
-                        interface_path.read_text(encoding="utf-8")
-                        if scoring_enabled and interface_path.is_file()
-                        else ""
-                    ),
-                },
+            apply_managed_domain_scope(
+                generator.render_template(
+                    generator.load_template("hitl/experiment_runner_context.txt"),
+                    {
+                        "hitl_phase": hitl_phase,
+                        "idea_json": json.dumps(idea, indent=2, default=str),
+                        "scoring_interface": (
+                            interface_path.read_text(encoding="utf-8")
+                            if scoring_enabled and interface_path.is_file()
+                            else ""
+                        ),
+                    },
+                )
             )
         )
 

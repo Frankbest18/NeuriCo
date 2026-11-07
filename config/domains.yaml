@@ -18,6 +18,12 @@ default_paper_style: neurips
 
 # Available research domains
 domains:
+  software_maintenance:
+    name: "Software Maintenance"
+    description: "Repairing, debugging, validating, and safely modifying existing software systems"
+    has_template: true
+    managed_role_supplement: true
+
   artificial_intelligence:
     name: "Artificial Intelligence"
     description: "LLM research, prompt engineering, AI agents, benchmarks"

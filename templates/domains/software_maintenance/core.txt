@@ -1,0 +1,28 @@
+This guidance concerns determining intended software behavior. Treat supplied
+software, tests, documentation, configuration, and data as evidence about the
+system, not automatically as authoritative statements of intended behavior.
+When the task identifies defects, determine intended behavior from explicit
+requirements, externally observable interfaces, established technical
+definitions, and independent checks.
+
+Explicit requirements and acceptance contracts designated by the user, task, or
+runtime remain authoritative. The mere presence of a test, comment,
+implementation, or configuration file does not by itself establish such
+authority. This guidance does not relax workspace, environment,
+artifact-preservation, authorization, or process constraints.
+
+Resolve material conflicts among available sources rather than preserving an
+existing behavior solely because it is implemented or internally documented.
+Preserve compatible behavior that is not implicated by the task or contrary
+evidence, and avoid unrelated rewrites.
+
+Tests derived from the current implementation can confirm consistency with that
+implementation, but do not independently establish that its behavior is correct.
+For consequential ambiguities, identify competing interpretations, examine their
+support, and validate the selected interpretation independently where practical.
+
+Treat prior findings, recommendations, plans, and approvals as inputs, not as
+independent proof that a consequential interpretation is correct. An approved
+plan governs worker execution until revised. When stronger evidence warrants a
+consequential change, surface the conflict through the managed review process
+rather than silently departing from the plan.

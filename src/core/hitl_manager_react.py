@@ -1131,6 +1131,24 @@ class HitlManager:
             raise ValueError(f"{subject} requires ask_human before finalization.")
         return str(human_inputs[-1].get("response", "")).strip()
 
+    def _managed_role_domain_supplement(self, *, focused_managed_ordinary: bool) -> str:
+        if not focused_managed_ordinary:
+            return ""
+        runtime_state = getattr(self, "runtime_state", None)
+        if runtime_state is None:
+            runtime_state = HitlRuntimeState(self.work_dir)
+        task = runtime_state.task_context()
+        if not isinstance(task, dict):
+            return ""
+        idea = task.get("idea")
+        if not isinstance(idea, dict):
+            return ""
+        from templates.prompt_generator import PromptGenerator
+
+        return PromptGenerator().managed_role_domain_supplement(
+            str(idea.get("domain", "general"))
+        )
+
     def review_raised_idea(
         self,
         *,
@@ -1225,6 +1243,9 @@ class HitlManager:
             "manager_review_raised_idea.txt",
             focused_autoresearch=focused_autoresearch,
             focused_managed_ordinary=focused_managed_ordinary,
+            managed_role_domain_supplement=self._managed_role_domain_supplement(
+                focused_managed_ordinary=focused_managed_ordinary
+            ),
             parent_node_id=assigned_candidate_sha,
             pipeline_stage=pipeline_stage,
             requesting_actor=str(raised_idea.get("actor", "")).strip(),
@@ -1383,6 +1404,9 @@ class HitlManager:
             "manager_review_phase_finish.txt",
             focused_autoresearch=focused_autoresearch,
             focused_managed_ordinary=focused_managed_ordinary,
+            managed_role_domain_supplement=self._managed_role_domain_supplement(
+                focused_managed_ordinary=focused_managed_ordinary
+            ),
             parent_node_id=assigned_candidate_sha,
             pipeline_stage=pipeline_stage,
             hitl_stage=hitl_stage,
