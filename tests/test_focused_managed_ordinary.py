@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -230,6 +231,39 @@ def test_resource_finder_uses_distinct_bootstrap_and_additional_contracts():
     assert "established managed research workspace" in additional
     assert "DIRECTION BUDGET" not in bootstrap
     assert "DIRECTION BUDGET" not in additional
+
+
+@pytest.mark.parametrize("phase", ["plan", "execution", "review"])
+def test_resource_description_is_scoped_and_preserves_existing_context(phase):
+    generator = PromptGenerator(ROOT / "templates")
+    idea = deepcopy(IDEA)
+    idea["idea"]["background"] = {"context": "Existing background context."}
+    kwargs = {"hitl_runtime_completion": True, "hitl_phase": phase}
+    without_description = generator.generate_resource_finder_prompt(
+        idea, focused_managed_ordinary=True, **kwargs
+    )
+    assert "User-Provided Instructions and Context" not in without_description
+
+    idea["idea"]["background"]["description"] = ""
+    assert generator.generate_resource_finder_prompt(
+        idea, focused_managed_ordinary=True, **kwargs
+    ) == without_description
+    legacy_prompts = {
+        focused: generator.generate_resource_finder_prompt(
+            idea, focused_autoresearch=focused, **kwargs
+        )
+        for focused in (False, True)
+    }
+    idea["idea"]["background"]["description"] = "Full task instructions."
+    prompt = generator.generate_resource_finder_prompt(
+        idea, focused_managed_ordinary=True, **kwargs
+    )
+    assert "Full task instructions." in prompt
+    assert "Existing background context." in prompt
+    for focused, legacy_prompt in legacy_prompts.items():
+        assert generator.generate_resource_finder_prompt(
+            idea, focused_autoresearch=focused, **kwargs
+        ) == legacy_prompt
 
 
 def test_manager_phase_review_receives_focused_ordinary_context(tmp_path):

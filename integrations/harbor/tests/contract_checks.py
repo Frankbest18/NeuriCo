@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import signal
 import sqlite3
@@ -86,6 +87,58 @@ def test_focused_managed_ordinary_idea_uses_mode_correct_labels(tmp_path: Path) 
         "harbor",
         "focused-managed-ordinary",
     ]
+
+
+@pytest.mark.parametrize("phase", ["plan", "execution", "review"])
+def test_focused_ordinary_workers_receive_complete_harbor_instruction(
+    tmp_path: Path, phase: str
+) -> None:
+    from core.pipeline_orchestrator import ResearchPipelineOrchestrator
+    from templates.prompt_generator import PromptGenerator
+
+    instruction = (
+        "Repair the supplied package.\n\n"
+        + "Inspect the supplied fixtures and reproduce the reported behavior. " * 20
+        + "\n\nRequired output: /app/final.json\n"
+        + "Do not download task-specific solutions.\n  Preserve this indentation.\n"
+    )
+    idea = build_harbor_idea(
+        HarborAutoResearchTask(instruction=instruction, workspace=tmp_path),
+        workflow="focused-managed-ordinary",
+    )
+    assert "Required output" not in idea["idea"]["hypothesis"]
+    templates = Path(runner_module.__file__).resolve().parents[3] / "templates"
+    generator = PromptGenerator(templates, workspace_mode="embedded")
+    resource_prompt = generator.generate_resource_finder_prompt(
+        idea,
+        provider="codex",
+        hitl_runtime_completion=True,
+        hitl_phase=phase,
+        focused_managed_ordinary=True,
+    )
+    assert instruction in resource_prompt
+    assert resource_prompt.count(instruction) == 1
+    assert generator._extract_user_instructions(resource_prompt) == instruction.strip()
+
+    orchestrator = ResearchPipelineOrchestrator(
+        work_dir=tmp_path,
+        templates_dir=templates,
+        managed_initial_run=True,
+        focused_autoresearch=True,
+    )
+    experiment_prompt = orchestrator._hitl_experiment_runner_source_prompt(
+        idea=idea,
+        provider="codex",
+        use_scribe=False,
+        scoring_enabled=False,
+        hitl_phase=phase,
+        benchmark_mode=True,
+    )
+    # Plan/review include the idea as JSON; execution renders the description.
+    assert (
+        instruction in experiment_prompt
+        or json.dumps(instruction)[1:-1] in experiment_prompt
+    )
 
 
 def test_hosted_gateway_uses_neutral_credential_and_full_model(tmp_path: Path) -> None:
