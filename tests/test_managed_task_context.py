@@ -1,6 +1,7 @@
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import Mock
+import subprocess
 
 import pytest
 import yaml
@@ -86,3 +87,178 @@ def test_preparation_refreshes_but_preserves_held_review(tmp_path):
 def test_legacy_manager_can_open_without_task(tmp_path):
     messages = manager(tmp_path)._messages(0, [])
     assert any("no saved user-provided task context" in m["content"] for m in messages)
+
+
+@pytest.mark.parametrize("mode", ["full", "auto"])
+@pytest.mark.parametrize("focused", [False, True])
+@pytest.mark.parametrize("autoresearch", [False, True])
+def test_pipeline_binds_before_workers(tmp_path, monkeypatch, mode, focused, autoresearch):
+    from core.pipeline_orchestrator import ResearchPipelineOrchestrator
+
+    owner = ResearchPipelineOrchestrator(
+        tmp_path, managed_initial_run=True, hitl_autoresearch=autoresearch,
+        focused_autoresearch=focused, hitl_mode=mode,
+    )
+    observed = []
+
+    def resource(**kwargs):
+        observed.append(task_from(manager(tmp_path, mode)._messages(0, [])))
+        return {"success": False, "hitl_terminal_failure": True}
+
+    monkeypatch.setattr(owner, "_run_resource_finder_hitl", resource)
+    owner.run_pipeline(idea(), hitl_enabled=True, scoring_enabled=autoresearch)
+    assert observed == [HitlRuntimeState(tmp_path).task_context()]
+    assert observed[0]["idea"]["background"] == idea()["idea"]["background"]
+
+
+def test_unmanaged_pipeline_does_not_bind_task(tmp_path, monkeypatch):
+    from core.pipeline_orchestrator import ResearchPipelineOrchestrator
+
+    owner = ResearchPipelineOrchestrator(tmp_path)
+    monkeypatch.setattr(owner, "_run_resource_finder", lambda **kwargs: {"success": False})
+    owner.run_pipeline(idea())
+    assert not (tmp_path / ".neurico/hitl/runtime.json").exists()
+
+
+def test_baseline_binds_before_manifest_review(tmp_path, monkeypatch):
+    from core.pipeline_orchestrator import ResearchPipelineOrchestrator
+
+    owner = ResearchPipelineOrchestrator(tmp_path, baseline_construction=True)
+    owner.state.state.update(workflow="ordinary", completed=True)
+    observed = []
+
+    def manifest():
+        observed.append(task_from(manager(tmp_path)._messages(0, [])))
+        return {"success": False}
+
+    monkeypatch.setattr(owner, "_run_managed_baseline_manifest", manifest)
+    owner.run_managed_baseline_construction(
+        idea=idea(), provider="codex", full_permissions=True,
+        manifest_trimmer_timeout=300, rule_maker_timeout=None, scorer_timeout=None,
+    )
+    assert observed[0]["idea"]["background"] == idea()["idea"]["background"]
+
+
+@pytest.mark.parametrize("mode", ["full", "auto"])
+@pytest.mark.parametrize("proposal_mode", ["single", "independent_ranked", "collaborative"])
+def test_autoresearch_task_runtimes_share_original_task(tmp_path, mode, proposal_mode):
+    from core.hitl import HitlRuntime
+    from core.hitl_autoresearch import HitlAutoResearchController
+    from core.hitl_proposal_round import normalize_proposal_mode_config, proposal_task_id
+
+    mgr = manager(tmp_path, mode)
+    owner_runtime = HitlRuntime(tmp_path, "experiment_runner", manager=mgr, hitl_mode=mode)
+    counts = {"proposer_count": 2, "reviewer_count": 2} if proposal_mode == "independent_ranked" else {}
+    owner = HitlAutoResearchController(
+        idea(), "task", tmp_path, tmp_path / "history",
+        proposal_generator=lambda **kw: {}, scorer=lambda **kw: {},
+        hitl_runtime=owner_runtime, hitl_mode=mode,
+        proposal_mode_config=normalize_proposal_mode_config(proposal_mode, **counts),
+    )
+    if proposal_mode == "independent_ranked":
+        child = owner._new_ranked_task_runtime(proposal_task_id(1, "proposer", 1))
+    elif proposal_mode == "collaborative":
+        from core.hitl_proposal_discussion import proposal_discussion_task_id
+        child = owner._new_discussion_task_runtime(
+            proposal_discussion_task_id("opening", participant_ordinal=1)
+        )
+    else:
+        child = owner._proposal_hitl_runtime()
+    assert child.manager is mgr
+    assert task_from(child.manager._messages(0, [])) == owner._task_context
+    assert owner._task_context["idea"]["background"] == idea()["idea"]["background"]
+
+
+@pytest.mark.parametrize("workflow", ["ordinary", "autoresearch"])
+def test_old_snapshot_rollback_restores_saved_binding_before_manager_reload(tmp_path, workflow):
+    from core.hitl import HitlRuntime
+    from core.hitl_autoresearch import HitlAutoResearchController
+    from core.hitl_git_state import HitlGitStateStore
+    from core.pipeline_orchestrator import ResearchPipelineOrchestrator
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for key, value in (("user.email", "test@example.com"), ("user.name", "Test")):
+        subprocess.run(["git", "-C", str(tmp_path), "config", key, value], check=True)
+    state = HitlRuntimeState(tmp_path)
+    store = HitlGitStateStore(tmp_path)
+    old_snapshot = store.create_rollback_snapshot()
+    bound = state.bind_task_context(idea())
+    changed = {"idea": {"title": "Newly loaded input must not replace saved review"}}
+    mgr = SimpleNamespace(reload_after_runtime_restore=lambda: observed.append(state.task_context()))
+    observed = []
+    if workflow == "ordinary":
+        owner = ResearchPipelineOrchestrator(tmp_path, managed_initial_run=True, hitl_manager=mgr)
+        owner._bind_task_context(changed)
+        runtime = owner._create_hitl_runtime("resource_finder")
+    else:
+        runtime = HitlRuntime(tmp_path, "experiment_runner", manager=mgr)
+        owner = HitlAutoResearchController(
+            changed, "task", tmp_path, tmp_path / "history",
+            proposal_generator=lambda **kw: {}, scorer=lambda **kw: {}, hitl_runtime=runtime,
+        )
+    store.restore(old_snapshot)
+    assert state.task_context() is None
+    runtime.reload_manager_after_state_restore()
+    assert observed == [bound]
+    assert task_from(manager(tmp_path)._messages(0, [])) == bound
+
+
+def test_prestart_initializer_does_not_refresh_saved_task(tmp_path, monkeypatch):
+    from cli import hitl_launcher
+
+    monkeypatch.setattr(hitl_launcher, "IdeaManager", lambda path: SimpleNamespace(get_idea=lambda id: idea()))
+    monkeypatch.setattr(hitl_launcher, "resolve_ideas_dir", lambda path: path / "ideas")
+    hitl_launcher.initialize_manager_task(tmp_path, "task", tmp_path)
+    state = HitlRuntimeState(tmp_path)
+    assert state.task_context()["idea"]["background"] == idea()["idea"]["background"]
+    saved = state.bind_task_context({"idea": {"title": "Prepared"}}, prepare_run=True)
+    hitl_launcher.initialize_manager_task(tmp_path, "task", tmp_path)
+    assert state.task_context() == saved
+
+
+@pytest.mark.parametrize("workflow", ["ordinary", "autoresearch"])
+def test_runner_supplies_prepared_task_before_starting_manager(tmp_path, monkeypatch, workflow):
+    from contextlib import ExitStack
+    from core.runner import ResearchRunner
+    from core.hitl_run_control import HitlRunStopControl, activate_hitl_run_stop_control
+    from core.hitl_lock import hitl_workspace_run_lease
+    import core.hitl_manager_host as hosts
+
+    source = idea()
+    source["idea"]["local_resources"] = {}
+    source["idea"]["constraints"].update(time_limit="old limit", time="old policy")
+    runner = ResearchRunner.__new__(ResearchRunner)
+    runner.idea_manager = SimpleNamespace(get_idea=lambda id: deepcopy(source), update_status=lambda *a: None)
+    runner.use_github = False
+    runner._copy_workspace_resources = lambda *args, **kwargs: None
+    observed = []
+
+    class StopAtHostStart(Exception):
+        pass
+
+    class Host:
+        def __init__(self, **kwargs):
+            pass
+
+        def start(self):
+            observed.append(task_from(manager(tmp_path)._messages(0, [])))
+            raise StopAtHostStart
+
+    monkeypatch.setattr(hosts, "HitlManagerHost", Host)
+    runner.project_root = tmp_path
+    options = {"hitl_research" if workflow == "ordinary" else "hitl_autoresearch": "cli"}
+    with ExitStack() as stack:
+        stack.enter_context(hitl_workspace_run_lease(
+            tmp_path, owner={"request_id": "test", "provider": "codex"}
+        ))
+        stack.enter_context(activate_hitl_run_stop_control(HitlRunStopControl(tmp_path, "test")))
+        with pytest.raises(StopAtHostStart):
+            ResearchRunner.run_research.__wrapped__(
+                runner, "task", provider="codex", hitl_work_dir=tmp_path,
+                paper_style="neurips", write_paper=False, _hitl_host_scope=stack,
+                **options,
+            )
+    bound = observed[0]["idea"]
+    assert bound["background"] == source["idea"]["background"]
+    assert ("time_limit" in bound["constraints"]) == (workflow == "ordinary")
+    assert ("time" in bound["constraints"]) == (workflow == "ordinary")
