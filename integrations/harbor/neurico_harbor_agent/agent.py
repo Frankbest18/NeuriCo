@@ -64,6 +64,7 @@ _COOPERATIVE_SHUTDOWN_GRACE_SECONDS = 30.0
 _CANCELLATION_GRACE_SECONDS = 30.0
 _FORCED_TERMINATION_GRACE_SECONDS = 5.0
 HarborWorkflow = Literal["autoresearch", "focused-managed-ordinary"]
+ReasoningEffort = Literal["low", "medium", "high", "xhigh"]
 
 
 @dataclass
@@ -95,6 +96,17 @@ def _harbor_workflow(environment: dict[str, str]) -> HarborWorkflow:
         raise ValueError(
             "NEURICO_HARBOR_WORKFLOW must be 'autoresearch' or "
             "'focused-managed-ordinary'"
+        )
+    return raw
+
+
+def _reasoning_effort(environment: dict[str, str]) -> ReasoningEffort | None:
+    raw = environment.get("NEURICO_HARBOR_REASONING_EFFORT")
+    if raw is None:
+        return None
+    if raw not in {"low", "medium", "high", "xhigh"}:
+        raise ValueError(
+            "NEURICO_HARBOR_REASONING_EFFORT must be low, medium, high, or xhigh"
         )
     return raw
 
@@ -186,6 +198,7 @@ async def run_autoresearch_process(
     connection: CodexInferenceConnection,
     base_environment: dict[str, str],
     workflow: HarborWorkflow,
+    reasoning_effort: ReasoningEffort | None,
     iterations: int | None,
     time_limit_seconds: int | None,
     emit: OutputHandler,
@@ -203,6 +216,7 @@ async def run_autoresearch_process(
             connection,
             ideas_dir=ideas_dir,
             codex_home=codex_home,
+            reasoning_effort=reasoning_effort,
         )
 
         command = [
@@ -411,6 +425,7 @@ class NeuricoHarborAgent(Agent):
             requested_model=session.model,
         )
         workflow = _harbor_workflow(self._environment)
+        reasoning_effort = _reasoning_effort(self._environment)
         iterations = (
             _autoresearch_iterations(self._environment) if workflow == "autoresearch" else None
         )
@@ -430,6 +445,7 @@ class NeuricoHarborAgent(Agent):
                 connection=connection,
                 base_environment=self._environment,
                 workflow=workflow,
+                reasoning_effort=reasoning_effort,
                 iterations=iterations,
                 time_limit_seconds=time_limit_seconds,
                 emit=lambda text: self._send_text(session_id, text),

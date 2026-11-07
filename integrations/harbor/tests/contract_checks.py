@@ -4,6 +4,7 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from neurico_harbor_agent.agent import (
     _autoresearch_iterations,
     _autoresearch_time_limit,
     _harbor_workflow,
+    _reasoning_effort,
     _stream_process_output,
     _terminate_process_tree,
     _text_from_prompt,
@@ -31,6 +33,7 @@ from neurico_harbor_agent.runtime import (
     build_autoresearch_environment,
     build_harbor_idea,
 )
+from neurico_harbor_agent.codex_bootstrap import CODEX_VERSION
 
 
 def test_prompt_text_is_preserved_verbatim() -> None:
@@ -49,6 +52,13 @@ def test_harbor_workflow_defaults_to_autoresearch_and_validates_override() -> No
         _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": ""})
     with pytest.raises(ValueError, match="NEURICO_HARBOR_WORKFLOW"):
         _harbor_workflow({"NEURICO_HARBOR_WORKFLOW": "ordinary"})
+
+
+def test_reasoning_effort_is_optional_and_validated() -> None:
+    assert _reasoning_effort({}) is None
+    assert _reasoning_effort({"NEURICO_HARBOR_REASONING_EFFORT": "high"}) == "high"
+    with pytest.raises(ValueError, match="NEURICO_HARBOR_REASONING_EFFORT"):
+        _reasoning_effort({"NEURICO_HARBOR_REASONING_EFFORT": "maximum"})
 
 
 def test_harbor_instruction_uses_neurico_idea_contract(tmp_path: Path) -> None:
@@ -92,6 +102,7 @@ def test_hosted_gateway_uses_neutral_credential_and_full_model(tmp_path: Path) -
     assert 'base_url = "https://gateway.example/v1"' in config
     assert 'env_key = "HOSTED_INFERENCE_TOKEN"' in config
     assert "secret" not in config
+    assert "model_reasoning_effort" not in tomllib.loads(config)
 
 
 def test_chatgpt_auth_mode_strips_openai_provider_prefix(tmp_path: Path) -> None:
@@ -130,13 +141,20 @@ def test_environment_exposes_locked_codex_and_isolated_home(tmp_path: Path) -> N
         connection,
         ideas_dir=ideas_dir,
         codex_home=codex_home,
+        reasoning_effort="high",
     )
     assert environment["NEURICO_IDEAS"] == str(ideas_dir)
     assert environment["CODEX_HOME"] == str(codex_home)
     assert (codex_home / "auth.json").read_text() == '{"tokens": {}}'
-    assert 'model = "test-model"' in (codex_home / "config.toml").read_text()
+    config = tomllib.loads((codex_home / "config.toml").read_text())
+    assert config["model"] == "test-model"
+    assert config["model_reasoning_effort"] == "high"
     first_path = Path(environment["PATH"].split(os.pathsep)[0])
     assert (first_path / "codex").is_file()
+
+
+def test_codex_runtime_pin_matches_study_version() -> None:
+    assert CODEX_VERSION == "0.167.0"
 
 
 def test_iteration_override_must_be_positive() -> None:
@@ -698,6 +716,7 @@ def test_acp_prompt_launches_autoresearch_not_direct_inference(
     assert captured["task"].instruction == instruction
     assert captured["task"].workspace == tmp_path
     assert captured["workflow"] == "autoresearch"
+    assert captured["reasoning_effort"] is None
     assert captured["iterations"] == 1
     assert captured["time_limit_seconds"] == 1740
     assert captured["connection"].backend_model == "test-model"
@@ -724,6 +743,7 @@ def test_acp_prompt_launches_focused_managed_ordinary_without_autoresearch_contr
                 "NEURICO_MODEL": "openai/test-model",
                 "NEURICO_CODEX_AUTH_FILE": str(auth_file),
                 "NEURICO_HARBOR_WORKFLOW": "focused-managed-ordinary",
+                "NEURICO_HARBOR_REASONING_EFFORT": "high",
                 "NEURICO_HARBOR_AUTORESEARCH_ITERATIONS": "invalid but unused",
                 "NEURICO_HARBOR_TIME_LIMIT_SECONDS": "invalid but unused",
             }
@@ -737,6 +757,7 @@ def test_acp_prompt_launches_focused_managed_ordinary_without_autoresearch_contr
 
     asyncio.run(run_prompt())
     assert captured["workflow"] == "focused-managed-ordinary"
+    assert captured["reasoning_effort"] == "high"
     assert captured["iterations"] is None
     assert captured["time_limit_seconds"] is None
 
