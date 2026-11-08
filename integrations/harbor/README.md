@@ -68,6 +68,8 @@ input.
   NeuriCo stage to the same model. `NEURICO_HARBOR_REASONING_EFFORT` optionally
   selects a validated Codex reasoning effort; the study configuration uses
   `high`.
+- Codex uses non-login shells so task-image login profiles cannot discard
+  NeuriCo's managed worker tool paths.
 - Local runs use a Codex login cache supplied through
   `NEURICO_CODEX_AUTH_FILE`. The adapter copies it into the isolated run home;
   it never writes the mounted source file.

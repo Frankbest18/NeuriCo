@@ -239,6 +239,7 @@ def test_hosted_gateway_uses_neutral_credential_and_full_model(tmp_path: Path) -
     assert 'env_key = "HOSTED_INFERENCE_TOKEN"' in config
     assert "secret" not in config
     assert "model_reasoning_effort" not in tomllib.loads(config)
+    assert tomllib.loads(config)["allow_login_shell"] is False
 
 
 def test_chatgpt_auth_mode_strips_openai_provider_prefix(tmp_path: Path) -> None:
@@ -285,6 +286,7 @@ def test_environment_exposes_locked_codex_and_isolated_home(tmp_path: Path) -> N
     config = tomllib.loads((codex_home / "config.toml").read_text())
     assert config["model"] == "test-model"
     assert config["model_reasoning_effort"] == "high"
+    assert config["allow_login_shell"] is False
     first_path = Path(environment["PATH"].split(os.pathsep)[0])
     assert (first_path / "codex").is_file()
 

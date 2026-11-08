@@ -117,6 +117,8 @@ class CodexInferenceConnection:
         config_lines = [
             f"model = {json.dumps(self.backend_model)}",
             'cli_auth_credentials_store = "file"',
+            # Task-image login profiles can discard the managed worker's tool PATH.
+            "allow_login_shell = false",
         ]
         if reasoning_effort is not None:
             config_lines.append(f"model_reasoning_effort = {json.dumps(reasoning_effort)}")
