@@ -11,13 +11,22 @@ implementation, or configuration file does not by itself establish such
 authority. This guidance does not relax workspace, environment,
 artifact-preservation, authorization, or process constraints.
 
-Resolve material conflicts among available sources rather than preserving an
-existing behavior solely because it is implemented or internally documented.
+Resolve material conflicts among available sources. Compare plausible
+interpretations on comparable terms, allowing either to remain provisional.
+Account for compatibility and change costs, but do not treat the existing
+implementation as decisive evidence of intended behavior when that behavior is
+implicated by the repair.
 Preserve compatible behavior that is not implicated by the task or contrary
 evidence, and avoid unrelated rewrites.
 
 Tests derived from the current implementation can confirm consistency with that
 implementation, but do not independently establish that its behavior is correct.
+When resolving a disputed component behavior implicated by the task, check
+whether downstream processing could mask the difference between plausible
+interpretations. If so, assess the component directly against independently
+supported requirements or properties; system-level success alone does not
+resolve that difference.
+
 Establishing that an existing behavior is mathematically valid, internally
 consistent, or conventional does not establish that it satisfies the supplied
 task. When deciding whether to preserve behavior implicated by the requested
