@@ -1,49 +1,18 @@
-This guidance concerns determining intended software behavior. Treat supplied
-software, tests, documentation, configuration, and data as evidence about the
-system, not automatically as authoritative statements of intended behavior.
-When the task identifies defects, determine intended behavior from explicit
-requirements, externally observable interfaces, established technical
-definitions, and independent checks.
+Complete the supplied software-maintenance task. For a repair request, fix the
+reported problems across the requested scope.
 
-Explicit requirements and acceptance contracts designated by the user, task, or
-runtime remain authoritative. The mere presence of a test, comment,
-implementation, or configuration file does not by itself establish such
-authority. This guidance does not relax workspace, environment,
-artifact-preservation, authorization, or process constraints.
+Treat every part of the supplied software as potentially defective—including
+its code, comments, documentation, formulas, assumptions, and apparent contracts.
+Use the task instructions, technical knowledge, and independent checks to
+determine what the software should do. A behavior can be mathematically valid
+and still fail to satisfy the task’s requirements. Treat such behavior as a
+defect. Preserve existing behavior only if it is appropriate, not simply because
+it already exists or is documented.
 
-Resolve material conflicts among available sources. Compare plausible
-interpretations on comparable terms, allowing either to remain provisional.
-Account for compatibility and change costs, but do not treat the existing
-implementation as decisive evidence of intended behavior when that behavior is
-implicated by the repair.
-Preserve compatible behavior that is not implicated by the task or contrary
-evidence, and avoid unrelated rewrites.
+Make reasonable decisions where details are unspecified, and revise them when
+evidence warrants. Keep research and testing focused on producing the correct
+solution. Investigate alternatives when they could improve the repair, without
+expanding the task into a redesign or demanding guarantees it does not require.
 
-Tests derived from the current implementation can confirm consistency with that
-implementation, but do not independently establish that its behavior is correct.
-When resolving a disputed component behavior implicated by the task, check
-whether downstream processing could mask the difference between plausible
-interpretations. If so, assess the component directly against independently
-supported requirements or properties; system-level success alone does not
-resolve that difference.
-
-Establishing that an existing behavior is mathematically valid, internally
-consistent, or conventional does not establish that it satisfies the supplied
-task. When deciding whether to preserve behavior implicated by the requested
-repair, explain what evidence connects that behavior to the task's intended
-requirements. If multiple interpretations remain plausible, preserve that
-uncertainty in the handoff and distinguish tests of the chosen implementation
-from evidence supporting the choice itself.
-
-Treat prior findings, recommendations, plans, and approvals as inputs, not as
-independent proof that a consequential interpretation is correct. An approved
-plan governs worker execution until revised. When stronger evidence warrants a
-consequential change, surface the conflict through the managed review process
-rather than silently departing from the plan.
-
-When reviewing a consequential interpretation, check whether the evidence
-supports its suitability for the task or merely its internal correctness.
-Approval of a working interpretation does not turn it into a user requirement.
-Request further investigation when a practical check could resolve a material
-uncertainty; otherwise retain the uncertainty explicitly in the decision and
-final assessment.
+Review the result against the original request. Request further work for
+concrete problems; uncertainty alone is not a reason to delay completion.

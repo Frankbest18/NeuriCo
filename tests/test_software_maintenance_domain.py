@@ -18,8 +18,8 @@ from core.pipeline_orchestrator import ResearchPipelineOrchestrator  # noqa: E40
 from templates.prompt_generator import PromptGenerator  # noqa: E402
 
 HEADING = "DOMAIN-SPECIFIC GUIDELINES: SOFTWARE MAINTENANCE"
-GUIDANCE = "Establishing that an existing behavior is mathematically valid"
-REVIEW_GUIDANCE = "Approval of a working interpretation does not turn it into a user requirement."
+GUIDANCE = "Treat every part of the supplied software as potentially defective"
+REVIEW_GUIDANCE = "uncertainty alone is not a reason to delay completion."
 IDEA = {
     "idea": {
         "title": "Repair the supplied software",
