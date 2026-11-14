@@ -54,10 +54,11 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
         assert "It is illegal for you to read the contents" in prompts["review"]
 
 
+@pytest.mark.parametrize("mode", ["auto", "full"])
 @pytest.mark.parametrize("phase", ["execution", "review"])
-def test_raised_idea_continuation_retains_guidance_and_feedback(tmp_path, phase):
+def test_raised_idea_continuation_retains_guidance_and_feedback(tmp_path, phase, mode):
     runtime = HitlRuntime(
-        tmp_path, "experiment_runner", channel=object(), manager=object(), hitl_mode="auto"
+        tmp_path, "experiment_runner", channel=object(), manager=object(), hitl_mode=mode
     )
     runtime.current_hitl_stage = phase
     runtime._tool_context["worker_prompt_contexts"] = {phase: "Original task context"}
@@ -148,32 +149,60 @@ def test_proposal_receives_evidence_principle_without_execution_instructions():
     "template,phase,boundary",
     [
         ("autoresearch_proposer", "proposal", "You are a planner only."),
-        ("proposal_verifier", "proposal", "do not approve it, rank it, rewrite it"),
-        ("proposal_reviewer", "proposal", "Do not approve a proposal"),
+        ("proposal_verifier", "review", "do not approve it, rank it, rewrite it"),
+        ("proposal_reviewer", "review", "Do not approve a proposal"),
         ("autoresearch_proposal_discussion", "proposal", "Do not edit the research workspace"),
         ("autoresearch_planning_discussion", "plan", "Do not perform execution work."),
     ],
 )
-def test_shared_guidance_preserves_proposal_and_discussion_roles(template, phase, boundary, mode):
-    from templates.prompt_generator import PromptGenerator
-
-    generator = PromptGenerator()
-    prompt = generator.render_template(
-        generator.load_template(f"agents/{template}.txt"),
-        {
-            "hitl_idea_reporting": True,
-            "hitl_submission": True,
-            "hitl_mode": mode,
-            "hitl_stage": phase,
-            "pipeline_stage": "experiment_runner",
-            "public_context": {},
-            "candidate_verification_pairs": [("I1", "I2")],
-        },
+def test_shared_guidance_preserves_proposal_and_discussion_roles(
+    tmp_path, template, phase, boundary, mode
+):
+    from agents.autoresearch_proposer import generate_autoresearch_proposal_prompt
+    from agents.planning_discussion import generate_planning_discussion_prompt
+    from agents.proposal_assessment import (
+        generate_proposal_reviewer_prompt,
+        generate_proposal_verifier_prompt,
     )
+    from agents.proposal_discussion import generate_proposal_discussion_prompt
+    from core.hitl_discussion import discussion_task_id
+
+    idea = {"idea": {"title": "Compare alternatives"}}
+    if template == "proposal_verifier":
+        prompt = generate_proposal_verifier_prompt(
+            assigned_proposal_idea_id="I1", hitl_mode=mode
+        )
+        assert "hitl-finish-proposal-verification" in prompt
+    elif template == "proposal_reviewer":
+        prompt = generate_proposal_reviewer_prompt(
+            candidate_verification_pairs=[("I1", "I2")], hitl_mode=mode
+        )
+        assert "hitl-finish-proposal-review" in prompt
+    elif template == "autoresearch_proposer":
+        prompt = generate_autoresearch_proposal_prompt(
+            idea, tmp_path, "a" * 40, tmp_path / "attempt",
+            Path(__file__).resolve().parents[1] / "templates",
+            hitl_idea_reporting=True, hitl_submission=True, hitl_mode=mode,
+        )
+    else:
+        arguments = dict(
+            idea=idea, work_dir=tmp_path,
+            discussion_task_id=discussion_task_id("opening", participant_ordinal=1),
+            discussion_records=[], hitl_mode=mode,
+        )
+        if template == "autoresearch_planning_discussion":
+            prompt = generate_planning_discussion_prompt(
+                **arguments, approved_proposal="Compare the alternatives",
+                assigned_candidate_sha="a" * 40, autoresearch_attempt=True,
+            )
+        else:
+            prompt = generate_proposal_discussion_prompt(**arguments)
+
     assert prompt.count("Identify checks that would distinguish the alternatives.") == 1
     assert "according to your responsibilities and the current stage" in prompt
     assert boundary in " ".join(prompt.split())
     assert "Run the planned investigations" not in prompt
     assert "Seek manager guidance when the proposed comparison" not in prompt
+    assert "Deliver the best-supported solution" not in prompt
     if phase == "plan":
         assert "Current workspace state, established knowledge" in prompt

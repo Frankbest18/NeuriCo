@@ -118,7 +118,7 @@ Experiment-runner reminders:
 - log method, evaluation, compute/resource, and artifact-boundary choices when
   you decide what to run, what to skip, how to adapt the implementation, or how
   to present outputs under the approved plan.
-{% if hitl_stage in ["execution", "review"] %}
+{% if hitl_stage in ["execution", "review"] and allow_raised_ideas %}
 
 Run the planned investigations and use their results to reassess the original
 decision. When a result conflicts with the task's requirements, investigate
