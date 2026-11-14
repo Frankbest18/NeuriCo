@@ -10,11 +10,12 @@ applicability. When they conflict with each other or with observed results,
 investigate which claims or assumptions need revision. Do not assume that every
 supplied claim must be preserved.
 
-Distinguish task requirements, established findings, assumptions, and open
-questions. Identify uncertainties that could materially change the solution.
-Choosing an approach does not establish that alternatives are wrong: keep
-plausible alternatives open until the evidence justifies excluding them. Revise
-your judgments as evidence develops, within the current phase's responsibilities.
+Distinguish explicit task requirements from your interpretation of them. When
+plausible alternatives could materially change the result, do not exclude one
+solely because it conflicts with your current interpretation or an approved
+choice. State the evidence that would distinguish the alternatives and
+investigate it. Keep any necessary working choice provisional until the evidence
+supports excluding the alternatives.
 
 For example, algorithm A takes 10 seconds and B takes 14 seconds on one input.
 This supports A for that input, but does not justify rejecting B. Compare them
@@ -118,10 +119,13 @@ Experiment-runner reminders:
   to present outputs under the approved plan.
 {% if hitl_stage in ["execution", "review"] %}
 
-Run the planned investigations, assess supporting and conflicting evidence, and
-update the solution. Use the results to identify and investigate consequential
-follow-up questions, bringing the findings back to the original decision.
-Revisit earlier assumptions when results challenge them.
+Run the planned investigations and use their results to reassess the original
+decision. When a result conflicts with the task's requirements, investigate
+whether the conflict comes from the evidence, implementation, or your
+interpretation. Repeating checks under the same disputed assumption does not
+test that assumption. If reconsideration requires changing the approved plan,
+raise the assumption and the proposed comparison through the existing manager
+mechanism.
 
 Work within the approved scope, current phase's permissions, and available
 resources. Deliver the best-supported solution, documenting unresolved

@@ -27,9 +27,9 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
         assert prompt.count("Treat supplied resources as evidence") == 1
         assert "supplied claim must be preserved" in prompt
         assert prompt.count("For example, algorithm A takes 10 seconds") == 1
-        assert "within the current phase's responsibilities" in prompt
-        assert "Distinguish task requirements, established findings" in prompt
-        assert "plausible alternatives open until the evidence justifies excluding them" in prompt
+        assert "current interpretation or an approved" in prompt
+        assert "Distinguish explicit task requirements" in prompt
+        assert "supports excluding the alternatives" in prompt
         assert ("Investigate resource relevance and reliability" in prompt) == (
             stage == "resource_finder" and phase in {"execution", "review"}
         )
@@ -67,7 +67,7 @@ def test_raised_idea_continuation_retains_guidance_and_feedback(tmp_path, phase)
     assert "Original task context" in prompt
     assert "Compare the two reference interpretations." in prompt
     assert "Run the planned investigations" in prompt
-    assert "plausible alternatives open until the evidence justifies excluding them" in prompt
+    assert "supports excluding the alternatives" in prompt
     assert runtime.worker_continuation()["prompt_block"] == prompt
 
 
@@ -83,12 +83,14 @@ def test_manager_decision_guidance_preserves_existing_authority(tmp_path, mode, 
         plan_text="Existing approved scope",
         hitl_mode=mode,
     )
-    assert "Check whether the evidence justifies the recommended decision" in prompt
-    assert "approval does not\nestablish their assumptions as facts" in prompt
+    assert "Check whether the worker's options include the consequential alternatives" in prompt
+    assert "task requirement or an approved choice as established fact" in prompt
+    assert "use CUSTOM feedback to direct a comparison" in prompt
     assert "CUSTOM" in prompt
     if mode == "auto":
         assert "`ask_human` is unavailable" in prompt
         assert "Do not add routing options" in prompt
+        assert "assumption within that scope is permitted" in prompt
     else:
         assert "preserve the worker's options exactly" in prompt
         assert "use `ask_human` inside this same request" in prompt
@@ -130,6 +132,6 @@ def test_proposal_receives_evidence_principle_without_execution_instructions():
         hitl_stage="proposal",
         hitl_mode="auto",
     )
-    assert "Distinguish task requirements, established findings" in prompt
+    assert "Distinguish explicit task requirements" in prompt
     assert "Run the planned investigations" not in prompt
     assert "hitl-submit-proposal" in prompt
