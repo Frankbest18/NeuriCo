@@ -5,12 +5,19 @@ research ideas. This is not bookkeeping. It helps future you, the manager, and
 downstream stages understand which evidence mattered, which choices were made,
 and what those choices depended on.
 
-When sources conflict, determine what each establishes for the task:
-requirements, definitions or reference models, observations, or assumptions.
-Follow explicit task requirements; assess factual claims against the evidence.
-A source's reputation or familiarity does not by itself establish that it
-governs this task. A decision to proceed under an interpretation does not
-establish that interpretation as fact.
+Distinguish task requirements, established findings, assumptions, and open
+questions. Identify uncertainties that could materially change the solution.
+Choosing an approach does not establish that alternatives are wrong: keep
+plausible alternatives open until the evidence justifies excluding them. Revise
+your judgments as evidence develops, within the current phase's responsibilities.
+
+For example, algorithm A takes 10 seconds and B takes 14 seconds on one input.
+This supports A for that input, but does not justify rejecting B. Compare them
+under comparable conditions across representative inputs. Suppose A is faster on
+small inputs and B on large inputs. Investigate which sizes matter for the task.
+If small inputs dominate, recommend A while retaining B as an alternative for
+large inputs. If the workload is unknown, document the conditional recommendation
+and uncertainty rather than declaring A universally superior.
 
 Record an idea whenever it would change what you or a later worker should do, or
 when it explains why a non-routine choice was made. These records are C-level
@@ -84,12 +91,11 @@ Resource-finder reminders:
   the resource search.
 {% if hitl_stage in ["execution", "review"] %}
 
-When conflicting resources support materially different interpretations of the
-task, investigate their applicability before recommending one. Preserve the
-plausible alternatives, supporting evidence, and unresolved questions in the
-existing handoff documents. Identify checks the experiment runner should
-perform when resolving the conflict requires experimentation beyond resource
-finding. Work within the approved scope{% if hitl_stage == "review" %} and the returned revision feedback{% endif %}.
+Investigate resource relevance and reliability within resource-finding scope,
+and revise your recommendations from the findings. In the existing handoff
+documents, distinguish established findings from provisional recommendations,
+preserve unresolved alternatives, and identify questions requiring downstream
+experiments.
 {% endif %}
 {% elif pipeline_stage == "experiment_runner" %}
 Experiment-runner reminders:
@@ -107,17 +113,15 @@ Experiment-runner reminders:
   to present outputs under the approved plan.
 {% if hitl_stage in ["execution", "review"] %}
 
-When multiple interpretations remain plausible and could materially change the
-result, investigate them through focused comparisons or tests before committing,
-where feasible within the approved scope and available resources. Seek evidence
-that distinguishes the alternatives; a successful computation under one
-interpretation does not by itself establish that interpretation as correct.
-Revise your working assumptions when warranted, and retain unresolved
-uncertainty when the checks do not distinguish the alternatives.
-{% if hitl_stage == "review" %}
-Apply this investigation to the returned revision feedback; do not restart
-completed work merely because uncertainty remains.
-{% endif %}
+Run the planned investigations, assess supporting and conflicting evidence, and
+update the solution. Use the results to identify and investigate consequential
+follow-up questions, bringing the findings back to the original decision.
+Revisit earlier assumptions when results challenge them.
+
+Work within the approved scope, current phase's permissions, and available
+resources. Deliver the best-supported solution, documenting unresolved
+alternatives, limitations, and justified confidence separately from the required
+output.
 {% endif %}
 {% elif pipeline_stage == "rule_maker" %}
 Rule-maker reminders:

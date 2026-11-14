@@ -24,12 +24,14 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
         "review": runtime.review_prompt_block("Check the conflicting reference."),
     }
     for phase, prompt in prompts.items():
-        assert "A source's reputation or familiarity" in prompt
-        assert "establish that interpretation as fact" in prompt
-        assert ("investigate their applicability before recommending one" in prompt) == (
+        assert prompt.count("For example, algorithm A takes 10 seconds") == 1
+        assert "within the current phase's responsibilities" in prompt
+        assert "Distinguish task requirements, established findings" in prompt
+        assert "plausible alternatives open until the evidence justifies excluding them" in prompt
+        assert ("Investigate resource relevance and reliability" in prompt) == (
             stage == "resource_finder" and phase in {"execution", "review"}
         )
-        assert ("a successful computation under one" in prompt) == (
+        assert ("Run the planned investigations" in prompt) == (
             stage == "experiment_runner" and phase in {"execution", "review"}
         )
         if phase in {"plan", "plan_revision"}:
@@ -37,7 +39,7 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
             assert "Do not perform stage execution work" in prompt
         if phase == "review":
             assert "Apply only this feedback. Do not broaden" in prompt
-    assert "focused checks for unresolved interpretations" in prompts["plan"]
+    assert "Planned investigations: the relevant alternatives" in prompts["plan"]
     if stage == "experiment_runner":
         assert "illegal to look for, depend on, or raise concerns" in prompts["execution"]
     if stage == "rule_maker":
@@ -62,8 +64,8 @@ def test_raised_idea_continuation_retains_guidance_and_feedback(tmp_path, phase)
     prompt = result["prompt_block"]
     assert "Original task context" in prompt
     assert "Compare the two reference interpretations." in prompt
-    assert "a successful computation under one" in prompt
-    assert "establish that interpretation as fact" in prompt
+    assert "Run the planned investigations" in prompt
+    assert "plausible alternatives open until the evidence justifies excluding them" in prompt
     assert runtime.worker_continuation()["prompt_block"] == prompt
 
 
@@ -79,8 +81,8 @@ def test_manager_decision_guidance_preserves_existing_authority(tmp_path, mode, 
         plan_text="Existing approved scope",
         hitl_mode=mode,
     )
-    assert "consider what further\ninvestigation could distinguish them" in prompt
-    assert "Approval of a decision does not establish its" in prompt
+    assert "Check whether the evidence justifies the recommended decision" in prompt
+    assert "approval does not\nestablish their assumptions as facts" in prompt
     assert "CUSTOM" in prompt
     if mode == "auto":
         assert "`ask_human` is unavailable" in prompt
@@ -108,12 +110,13 @@ def test_manager_reviews_investigations_at_the_correct_phase(tmp_path, phase, st
         requires_human_approval=False,
         hitl_mode="auto",
     )
-    assert ("do not require its\nexecution during planning" in prompt) == (phase == "plan")
-    assert ("rather\n  than only by an earlier decision or approval" in prompt) == (
+    assert ("Assess the plan without requiring execution during planning" in prompt) == (phase == "plan")
+    assert ("Check whether the evidence supports the delivered work" in prompt) == (
         phase in {"execution", "review"}
     )
     if phase != "plan":
-        assert "do not require exhaustive comparisons or elimination of all uncertainty" in prompt
+        assert "A manager-approved deviation does not make an unmet requirement" in prompt
+    assert "do not require exhaustive comparisons" not in prompt
 
 
 def test_proposal_receives_evidence_principle_without_execution_instructions():
@@ -123,6 +126,6 @@ def test_proposal_receives_evidence_principle_without_execution_instructions():
         hitl_stage="proposal",
         hitl_mode="auto",
     )
-    assert "A source's reputation or familiarity" in prompt
-    assert "a successful computation under one" not in prompt
+    assert "Distinguish task requirements, established findings" in prompt
+    assert "Run the planned investigations" not in prompt
     assert "hitl-submit-proposal" in prompt
