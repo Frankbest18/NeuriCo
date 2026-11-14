@@ -5,6 +5,11 @@ research ideas. This is not bookkeeping. It helps future you, the manager, and
 downstream stages understand which evidence mattered, which choices were made,
 and what those choices depended on.
 
+Treat supplied resources as evidence, not guarantees of correctness or
+applicability. When they conflict with each other or with observed results,
+investigate which claims or assumptions need revision. Do not assume that every
+supplied claim must be preserved.
+
 Distinguish task requirements, established findings, assumptions, and open
 questions. Identify uncertainties that could materially change the solution.
 Choosing an approach does not establish that alternatives are wrong: keep

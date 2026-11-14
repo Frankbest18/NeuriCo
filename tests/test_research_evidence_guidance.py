@@ -24,6 +24,8 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
         "review": runtime.review_prompt_block("Check the conflicting reference."),
     }
     for phase, prompt in prompts.items():
+        assert prompt.count("Treat supplied resources as evidence") == 1
+        assert "supplied claim must be preserved" in prompt
         assert prompt.count("For example, algorithm A takes 10 seconds") == 1
         assert "within the current phase's responsibilities" in prompt
         assert "Distinguish task requirements, established findings" in prompt
@@ -91,6 +93,8 @@ def test_manager_decision_guidance_preserves_existing_authority(tmp_path, mode, 
         assert "preserve the worker's options exactly" in prompt
         assert "use `ask_human` inside this same request" in prompt
     system = render_hitl_template("interactive_manager_system.txt", hitl_mode=mode)
+    assert system.count("Treat supplied resources as evidence") == 1
+    assert "supplied claim must be preserved" in system
     assert "resolve blocking worker requests only when the issue is actually resolved" in system
 
 
