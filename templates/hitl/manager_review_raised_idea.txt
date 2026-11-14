@@ -65,6 +65,15 @@ premise, option, or requested action that looks for or depends on another file
 within `scoring/`. Do not select an option that preserves such a premise.
 {% endif %}
 
+When a decision depends on conflicting sources or interpretations, first
+determine what the task requires and what the available evidence establishes.
+If materially different interpretations remain plausible, consider what further
+investigation could distinguish them before committing to one. Direct useful
+checks within the approved scope and available resources. If a choice is needed
+before the uncertainty can be resolved, make the best-supported decision and
+keep its assumptions explicit. Approval of a decision does not establish its
+assumptions as facts.
+
 {% if hitl_mode == "auto" %}
 Resolve this NeuriCo Auto HITL raised idea as manager.
 

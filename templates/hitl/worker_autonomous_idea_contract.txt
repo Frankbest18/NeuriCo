@@ -5,6 +5,13 @@ research ideas. This is not bookkeeping. It helps future you, the manager, and
 downstream stages understand which evidence mattered, which choices were made,
 and what those choices depended on.
 
+When sources conflict, determine what each establishes for the task:
+requirements, definitions or reference models, observations, or assumptions.
+Follow explicit task requirements; assess factual claims against the evidence.
+A source's reputation or familiarity does not by itself establish that it
+governs this task. A decision to proceed under an interpretation does not
+establish that interpretation as fact.
+
 Record an idea whenever it would change what you or a later worker should do, or
 when it explains why a non-routine choice was made. These records are C-level
 when you can continue autonomously after logging them.
@@ -75,6 +82,15 @@ Resource-finder reminders:
   caveats;
 - log search-strategy changes when early results narrow, broaden, or redirect
   the resource search.
+{% if hitl_stage in ["execution", "review"] %}
+
+When conflicting resources support materially different interpretations of the
+task, investigate their applicability before recommending one. Preserve the
+plausible alternatives, supporting evidence, and unresolved questions in the
+existing handoff documents. Identify checks the experiment runner should
+perform when resolving the conflict requires experimentation beyond resource
+finding. Work within the approved scope{% if hitl_stage == "review" %} and the returned revision feedback{% endif %}.
+{% endif %}
 {% elif pipeline_stage == "experiment_runner" %}
 Experiment-runner reminders:
 - Within `scoring/`, you only need to follow `scoring/interface.md`. It is
@@ -89,6 +105,20 @@ Experiment-runner reminders:
 - log method, evaluation, compute/resource, and artifact-boundary choices when
   you decide what to run, what to skip, how to adapt the implementation, or how
   to present outputs under the approved plan.
+{% if hitl_stage in ["execution", "review"] %}
+
+When multiple interpretations remain plausible and could materially change the
+result, investigate them through focused comparisons or tests before committing,
+where feasible within the approved scope and available resources. Seek evidence
+that distinguishes the alternatives; a successful computation under one
+interpretation does not by itself establish that interpretation as correct.
+Revise your working assumptions when warranted, and retain unresolved
+uncertainty when the checks do not distinguish the alternatives.
+{% if hitl_stage == "review" %}
+Apply this investigation to the returned revision feedback; do not restart
+completed work merely because uncertainty remains.
+{% endif %}
+{% endif %}
 {% elif pipeline_stage == "rule_maker" %}
 Rule-maker reminders:
 - log evidence about a metric's validity, a dataset/split constraint, a
