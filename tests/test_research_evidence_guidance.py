@@ -30,6 +30,11 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
         assert "current interpretation or an approved" in prompt
         assert "Distinguish explicit task requirements" in prompt
         assert "supports excluding the alternatives" in prompt
+        assert "according to your responsibilities and the current stage" in prompt
+        assert ("Seek manager guidance when the proposed comparison" in prompt) == (
+            stage == "experiment_runner" and phase in {"execution", "review"}
+        )
+        assert "If reconsideration requires changing the approved plan" not in prompt
         assert ("Investigate resource relevance and reliability" in prompt) == (
             stage == "resource_finder" and phase in {"execution", "review"}
         )
@@ -41,6 +46,7 @@ def test_worker_guidance_respects_phase_and_agent_scope(tmp_path, mode, stage):
             assert "Do not perform stage execution work" in prompt
         if phase == "review":
             assert "Apply only this feedback. Do not broaden" in prompt
+    assert "Current workspace state, established knowledge" in prompts["plan"]
     assert "Planned investigations: the relevant alternatives" in prompts["plan"]
     if stage == "experiment_runner":
         assert "illegal to look for, depend on, or raise concerns" in prompts["execution"]
@@ -135,3 +141,39 @@ def test_proposal_receives_evidence_principle_without_execution_instructions():
     assert "Distinguish explicit task requirements" in prompt
     assert "Run the planned investigations" not in prompt
     assert "hitl-submit-proposal" in prompt
+
+
+@pytest.mark.parametrize("mode", ["auto", "full"])
+@pytest.mark.parametrize(
+    "template,phase,boundary",
+    [
+        ("autoresearch_proposer", "proposal", "You are a planner only."),
+        ("proposal_verifier", "proposal", "do not approve it, rank it, rewrite it"),
+        ("proposal_reviewer", "proposal", "Do not approve a proposal"),
+        ("autoresearch_proposal_discussion", "proposal", "Do not edit the research workspace"),
+        ("autoresearch_planning_discussion", "plan", "Do not perform execution work."),
+    ],
+)
+def test_shared_guidance_preserves_proposal_and_discussion_roles(template, phase, boundary, mode):
+    from templates.prompt_generator import PromptGenerator
+
+    generator = PromptGenerator()
+    prompt = generator.render_template(
+        generator.load_template(f"agents/{template}.txt"),
+        {
+            "hitl_idea_reporting": True,
+            "hitl_submission": True,
+            "hitl_mode": mode,
+            "hitl_stage": phase,
+            "pipeline_stage": "experiment_runner",
+            "public_context": {},
+            "candidate_verification_pairs": [("I1", "I2")],
+        },
+    )
+    assert prompt.count("Identify checks that would distinguish the alternatives.") == 1
+    assert "according to your responsibilities and the current stage" in prompt
+    assert boundary in " ".join(prompt.split())
+    assert "Run the planned investigations" not in prompt
+    assert "Seek manager guidance when the proposed comparison" not in prompt
+    if phase == "plan":
+        assert "Current workspace state, established knowledge" in prompt

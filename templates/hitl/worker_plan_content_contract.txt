@@ -1,6 +1,7 @@
 Required plan content:
 - goal and scope for this stage
-- Current knowledge, consequential assumptions, and unresolved questions.
+- Current workspace state, established knowledge, consequential assumptions,
+  and unresolved questions.
 - intended artifacts to create or update
 - step-by-step execution plan
 - decision/evidence criteria for ideas that can be handled autonomously
